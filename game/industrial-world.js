@@ -491,6 +491,44 @@ function validSpot(w,x,y){
 function command(base,msg,now=Date.now()){
   const w=ensure(base);advance(w,now);
   const kind=msg.action;
+  if(kind==="line"){
+    const type=msg.machine;
+    if(!["belt","pipe","pole","wall"].includes(type))return {ok:false,error:"この設備はライン敷設に対応していません"};
+    if(!unlocked(w,DEFINITIONS[type].tech))return {ok:false,error:"先に研究を解放してください"};
+    const {x,y,tx,ty}=msg;
+    if(!inside(x,y,w.radius)||!inside(tx,ty,w.radius))return {ok:false,error:"建設可能範囲外です"};
+    const dx=Math.abs(tx-x),dy=Math.abs(ty-y);
+    if(dx+dy<1||dx+dy>40)return {ok:false,error:"ラインは1回につき40マスまでです"};
+    const points=[{x,y}];
+    let cx=x,cy=y;
+    while(cx!==tx){cx+=tx>cx?1:-1;points.push({x:cx,y:cy});}
+    while(cy!==ty){cy+=ty>cy?1:-1;points.push({x:cx,y:cy});}
+    const cost={};
+    for(let i=0;i<points.length;i++){
+      const point=points[i],old=w.entities[key(point.x,point.y)];
+      if(old && old.type!==type)return {ok:false,error:"ライン上に異なる設備があります"};
+      if(tileAt(w.seed,point.x,point.y).terrain==="water")return {ok:false,error:"水面にはラインを通せません"};
+      // Line segments can grow away from existing factories, but the first
+      // segment must remain within network reach.
+      if(i===0 && !old && !validSpot(w,point.x,point.y))return {ok:false,error:"工場から遠すぎます"};
+      if(!old)for(const [item,n] of Object.entries(COST[type]))cost[item]=(cost[item]||0)+n;
+    }
+    if(Object.keys(w.entities).length+points.filter(p=>!w.entities[key(p.x,p.y)]).length>MAX_BUILDINGS)
+      return {ok:false,error:"設備数が上限に達しました"};
+    if(!hasCost(w.warehouse,cost))return {ok:false,error:"ライン敷設に必要な資材が不足しています"};
+    charge(w.warehouse,cost);
+    for(let i=0;i<points.length;i++){
+      const p=points[i],next=points[i+1],before=points[i-1];
+      const other=next||before;
+      const direction=other?(next?(next.x>p.x?1:next.x<p.x?3:next.y>p.y?2:0):
+       (p.x>before.x?1:p.x<before.x?3:p.y>before.y?2:0)):1;
+      const id=key(p.x,p.y);
+      if(!w.entities[id])w.entities[id]=makeEntity(type,p.x,p.y,direction);
+      else if(type==="belt"||type==="pipe")w.entities[id].dir=direction;
+    }
+    addLog(w,type+"ライン "+points.length+"マスを敷設");
+    return {ok:true,built:points.length};
+  }
   if(kind==="build"){
     const x=msg.x,y=msg.y,type=msg.machine,d=DEFINITIONS[type];
     if(!d||type==="core"||!inside(x,y,Math.max(w.radius,0)))return {ok:false,error:"建設範囲外です"};
