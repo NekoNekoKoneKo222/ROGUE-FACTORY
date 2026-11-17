@@ -17,7 +17,8 @@ const DEFINITIONS = Object.freeze({
   rocket:    { name: "ミサイル", icon: "🚀", hp: 90, cost: 38, power: 6 },
   wall:      { name: "装甲壁", icon: "▦", hp: 160, cost: 9, power: 0 },
   shield:    { name: "シールド", icon: "◈", hp: 90, cost: 28, power: 5 },
-  repair:    { name: "修復機", icon: "✚", hp: 80, cost: 30, power: 4 }
+  repair:    { name: "修復機", icon: "✚", hp: 80, cost: 30, power: 4 },
+  tankPlant: { name: "戦車工場", icon: "▣", hp: 160, cost: 78, power: 4 }
 });
 const UPGRADES = [
   { id:"mine", name:"高速採掘", icon:"⛏", rarity:"RARE", description:"採掘機の生産速度+40%" },
@@ -70,7 +71,22 @@ function newGame(a,b,options={}) {
   };
   if(stage){
     const [human,enemy]=game.players;
-    human.scrap=stage.playerScrap??36;
+    const base=options.homeBase;
+    if(base?.board?.length===SIZE*SIZE && stage.id!=="tutorial"){
+      human.board=base.board.map(item=>{
+        if(!item)return null;
+        const m=item.type==="core"?machine("core",0):machine(item.type,item.dir);
+        m.hp=DEFINITIONS[m.type]?.hp||400;
+        m.level=Math.max(1,Math.min(5,Number(item.level)||1));
+        return m;
+      });
+      human.scrap=Math.max(40,Math.min(500,Math.floor(base.resources?.scrap||0)));
+      game.tankGarrison=Math.min(20,Math.max(0,Math.floor(base.army?.tank||0))+
+          Math.max(0,Math.floor(base.army?.artillery||0))*2));
+      // Main HQ never gets removed or overwritten by a lost expedition.
+      game.homeBaseActive=true;
+    }
+    human.scrap=base && stage.id!=="tutorial"?Math.max(40,Math.min(500,Math.floor(base.resources?.scrap||0))):(stage.playerScrap??36);
     enemy.scrap=stage.enemyScrap??36;
     enemy.incomeFactor=stage.enemyIncome??1;
     enemy.damageFactor=stage.enemyDamage??1;
@@ -226,6 +242,18 @@ function spawnWave(game){
 function processEnemies(game,dt){
   if(!game.enemies.length)return;
   const human=game.players[0];
+  // Tanks stationed at the permanent base help guard it against enemy assaults.
+  // They are not consumed in campaign battles; PvP raids consume deployed units.
+  if(game.tankGarrison>0){
+    game.tankTimer=(game.tankTimer||0)+dt;
+    if(game.tankTimer>=2){
+      game.tankTimer=0;
+      const target=game.enemies.reduce((a,b)=>b.progress>a.progress?b:a);
+      target.hp=Math.max(0,target.hp-game.tankGarrison*2);
+      human.stats.damage+=game.tankGarrison*2;
+      game.enemies=game.enemies.filter(e=>e.hp>0);
+    }
+  }
   for(const enemy of game.enemies){
     enemy.progress+=enemy.speed*dt;
     if(enemy.progress<1)continue;
@@ -349,6 +377,7 @@ function snapshot(game) {
   return {id:game.id,elapsed:Math.round(game.elapsed*10)/10,length:game.length,
     mode:game.mode,stageId:game.stageId,stageName:game.stageName,stageRule:game.stageRule,
     phase:game.phase,buildTime:game.buildTime,wave:game.wave,maxWaves:game.maxWaves,threatHits:game.threatHits,
+    tankGarrison:game.tankGarrison||0,
     enemies:game.enemies.map(e=>({id:e.id,kind:e.kind,hp:Math.ceil(e.hp),maxHp:e.maxHp,progress:e.progress})),
     ended:game.ended,winner:game.winner,
     finishReason:game.finishReason,event:game.event,
