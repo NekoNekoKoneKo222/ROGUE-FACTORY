@@ -178,10 +178,14 @@
        '<div class="iw-row"><span>電力供給</span><strong>'+num(power.supply||0)+' MW</strong></div>'+
        '<div class="iw-row"><span>消費電力</span><strong>'+num(power.used||0)+' MW</strong></div>'+
        '<div class="iw-progress"><i style="width:'+Math.min(100,Math.round((power.used||0)/Math.max(1,power.supply||0)*100))+'%"></i></div>'+
-       '<div class="iw-row"><span>供給ネットワーク</span><strong>'+num(power.networks||0)+'</strong></div></div>'+
+       '<div class="iw-row"><span>供給ネットワーク</span><strong>'+num(power.networks||0)+'</strong></div>'+
+       '<div class="iw-row"><span>蓄電量</span><strong>'+num(power.stored||0)+' MJ</strong></div></div>'+
        '<div class="iw-panel-box"><div class="iw-row"><span>採掘済み鉱石</span><strong>'+num(w.stats?.mined)+'</strong></div>'+
+       '<div class="iw-row"><span>採掘効率</span><strong>'+num(w.rates?.mined)+' / 分</strong></div>'+
        '<div class="iw-row"><span>製造した製品</span><strong>'+num(w.stats?.crafted)+'</strong></div>'+
+       '<div class="iw-row"><span>製造効率</span><strong>'+num(w.rates?.crafted)+' / 分</strong></div>'+
        '<div class="iw-row"><span>倉庫に搬送</span><strong>'+num(w.stats?.shipped)+'</strong></div>'+
+       '<div class="iw-row"><span>出荷効率</span><strong>'+num(w.rates?.shipped)+' / 分</strong></div>'+
        '<div class="iw-row"><span>防衛成功（撃破）</span><strong>'+num(w.stats?.kills)+'</strong></div></div>'+
        '<div class="iw-panel-box"><div class="iw-row"><span>領土半径</span><strong>'+num(w.radius)+' TILE</strong></div>'+
        '<div class="iw-row"><span>研究ポイント</span><strong>'+num(w.research?.points)+'</strong></div>'+
@@ -257,9 +261,12 @@
        '<div class="iw-row"><span>次の襲撃</span><strong>'+num(w.waveIn)+' 秒</strong></div>'+
        '<div class="iw-row"><span>現在の敵</span><strong>'+num(w.enemies.length)+'</strong></div>'+
        '<div class="iw-row"><span>総撃破数</span><strong>'+num(w.stats?.kills)+'</strong></div>'+
-       '<div class="iw-row"><span>駐屯戦車</span><strong>'+num(w.army?.tank||0)+'</strong></div>'+
+       '<div class="iw-row"><span>使用可能な戦車</span><strong>'+num(w.army?.tank||0)+'</strong></div>'+
+       '<div class="iw-row"><span>出撃中の戦車</span><strong>'+num(w.friendly?.length||0)+'</strong></div>'+
        '<div class="iw-row"><span>汚染量</span><strong>'+num(w.pollution)+'</strong></div></div>'+
        '<p class="iw-panel-desc">工場の汚染が高いほど襲撃が頻繁になります。砲台に弾薬を供給し、必要なら修理ロボット基地を設置してください。</p>'+
+       '<button class="iw-action" data-command="dispatch"'+((w.army?.tank||0)<1 || !(w.research?.unlocked||[]).includes("tanks")?' disabled':'')+
+       '>▰ 自動戦車を1台防衛出撃させる</button>'+
        (w.enemies||[]).slice(0,8).map(e=>'<div class="iw-enemy-card"><span class="iw-enemy-icon">'+
          (e.type==="armored"?"▣":"✹")+'</span><div><strong>'+safe(e.type==="armored"?"重装機械獣":"機械虫")+'</strong>'+
          '<small>HP '+num(e.hp)+' / '+num(e.maxHp)+' — X '+Math.floor(e.x)+' / Y '+Math.floor(e.y)+'</small></div></div>').join("");
@@ -420,6 +427,21 @@
      }
    }
  }
+ function paintFriendlies(t){
+   const s=cellSize();
+   for(const tank of state.friendly||[]){
+     const x=(tank.x-camera.x)*s+CW/2,y=(tank.y-camera.y)*s+CH/2;
+     if(x<-30||x>CW+30||y<-30||y>CH+30)continue;
+     ctx.save();ctx.translate(x,y);ctx.shadowBlur=12;ctx.shadowColor="#4fffe3";
+     ctx.fillStyle="#175b60";ctx.strokeStyle="#aafff0";ctx.lineWidth=2;
+     ctx.fillRect(-s*.27,-s*.22,s*.54,s*.44);ctx.strokeRect(-s*.27,-s*.22,s*.54,s*.44);
+     ctx.shadowBlur=0;ctx.fillStyle="#e7fff7";ctx.textBaseline="middle";ctx.textAlign="center";
+     ctx.font=Math.max(11,s*.32)+"px sans-serif";ctx.fillText("▰",0,0);
+     ctx.fillStyle="#173c39";ctx.fillRect(-s*.28,s*.25,s*.56,3);
+     ctx.fillStyle="#6ffbdd";ctx.fillRect(-s*.28,s*.25,s*.56*Math.max(0,tank.hp/tank.maxHp),3);
+     ctx.restore();
+   }
+ }
  function paintEnemies(t){
    const s=cellSize();
    for(const e of state.enemies||[]){
@@ -458,7 +480,7 @@
    const rect=canvas.getBoundingClientRect();
    if(rect.width!==CW||rect.height!==CH)resize();
    ctx.save();ctx.clearRect(0,0,CW,CH);
-   paintTerrain();paintMachines(time);paintEnemies(time);paintCursor(time);
+   paintTerrain();paintMachines(time);paintFriendlies(time);paintEnemies(time);paintCursor(time);
    ctx.restore();
    if(time-lastMini>2000){paintMini();lastMini=time;}
  }
