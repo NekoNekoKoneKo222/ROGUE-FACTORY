@@ -65,7 +65,10 @@ test("land expansion increases the buildable area without finite stage boundarie
 });
 test("no buildings can be placed into water, outside land or on non-ore drills",()=>{
  const {base,world}=fresh();
- assert.equal(Industrial.command(base,{action:"build",machine:"drill",x:2,y:2}).ok,false);
+ const empty=Array.from({length:25},(_,i)=>({x:i%5-2,y:Math.floor(i/5)-2}))
+   .find(p=>!Shared.tileAt(world.seed,p.x,p.y).ore && !world.entities[point(p.x,p.y)]);
+ assert.ok(empty,"A deterministic empty spot should be available near the HQ");
+ assert.equal(Industrial.command(base,{action:"build",machine:"drill",x:empty.x,y:empty.y}).ok,false);
  assert.equal(Industrial.command(base,{action:"build",machine:"furnace",x:0,y:0}).ok,false);
  assert.equal(Industrial.command(base,{action:"build",machine:"furnace",x:3000,y:0}).ok,false);
  assert.equal(world.entities["0,0"].type,"core");
