@@ -9,6 +9,7 @@ const { Pool } = require("pg");
 const engine = require("./game/engine");
 const WorldData = require("./public/world-data.js");
 const Headquarters = require("./game/headquarters");
+const Industry = require("./game/industrial-world");
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = path.resolve(__dirname, "public");
@@ -82,6 +83,33 @@ function startGame(sockets,players,options={}){
     }
   },250);
 }
+async function handleIndustry(ws,msg){
+  if(!homeApi){send(ws,{type:"industry:error",message:"データベースがまだ準備できていません"});return;}
+  if(!ws.accountId){send(ws,{type:"industry:error",message:"恒久基地にログインしてください"});return;}
+  if(msg.type==="industry:open" || msg.type==="industry:poll"){
+    const result=await homeApi.mutate(ws.accountId,base=>{
+      Industry.advance(Industry.ensure(base));
+      return {ok:true};
+    });
+    if(!result.ok){send(ws,{type:"industry:error",message:result.error});return;}
+    const state=Industry.snapshot(result.base);
+    if(msg.type==="industry:open")send(ws,{type:"industry:welcome",state,
+      defs:Industry.DEFINITIONS,costs:Industry.COST,recipes:Industry.RECIPES,techs:Industry.TECHS});
+    else send(ws,{type:"industry:state",state});
+    return;
+  }
+  if(msg.type==="industry:action"){
+    const result=await homeApi.mutate(ws.accountId,base=>Industry.command(base,msg));
+    if(!result.ok){
+      send(ws,{type:"industry:error",message:result.error});
+      return;
+    }
+    send(ws,{type:"industry:state",state:Industry.snapshot(result.base),
+      notice:"工場の変更を保存しました",action:msg.action,coord:[msg.x,msg.y]});
+    return;
+  }
+  send(ws,{type:"industry:error",message:"不明な工場操作です"});
+}
 async function handleHome(ws,msg){
   if(!msg.type?.startsWith("home:"))return false;
   if(!homeApi){send(ws,{type:"home:error",message:"基地保存サーバーが準備できていません"});return true;}
@@ -145,6 +173,13 @@ wss.on("connection",ws=>{
     const now=Date.now();
     if(now-ws.msgWindow>1000){ws.msgWindow=now;ws.msgCount=0;}
     if(++ws.msgCount>24){send(ws,{type:"home:error",message:"操作が速すぎます"});return;}
+    if(msg.type?.startsWith("industry:")){
+      try{await handleIndustry(ws,msg);}catch(e){
+        console.error("Industrial world error:",e.message);
+        send(ws,{type:"industry:error",message:"工業ワールドの処理に失敗しました"});
+      }
+      return;
+    }
     if(msg.type?.startsWith("home:")){
       try{await handleHome(ws,msg);}catch(e){
         console.error("HQ operation failed:",e.message);
