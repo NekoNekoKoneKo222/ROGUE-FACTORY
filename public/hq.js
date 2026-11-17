@@ -47,7 +47,8 @@ function receive(msg){
   types=msg.buildings||{};units=msg.units||{};
   oreSites=new Set(msg.oreSites||[]);
   prepareGrid();preparePalette();render();
-  if(pendingOpen || !document.body.classList.contains("playing"))open();
+  if(pendingOpen)open();
+  window.IndustrialWorld?.onHomeReady();
   return true;
  }
  if(msg.type==="home:state"){
@@ -248,5 +249,6 @@ document.querySelectorAll("[data-hq-tab]").forEach(b=>b.onclick=()=>showTab(b.da
 $("hqToWorld").onclick=()=>{window.RogueWorld?.open(window.RogueWorld?.nextStage());};
 $("hqToDefense").onclick=()=>{window.RogueWorld?.open(window.RogueWorld?.nextStage());};
 setInterval(()=>{if(visible()&&accountId&&Date.now()-lastRefresh>15000)loadState();},15000);
-window.RogueHQ={onConnected,onDisconnected,receive,open,close,get accountId(){return accountId;},get hasHome(){return !!base;}};
+window.RogueHQ={onConnected,onDisconnected,receive,open,close,sendCommand:command,
+  get accountId(){return accountId;},get hasHome(){return !!base;},get connected(){return connected;}};
 })();

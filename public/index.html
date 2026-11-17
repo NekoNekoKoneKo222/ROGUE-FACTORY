@@ -9,11 +9,14 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/world.css">
   <link rel="stylesheet" href="/hq.css">
+  <link rel="stylesheet" href="/industrial.css">
+  <script defer src="/industrial-shared.js"></script>
   <script defer src="/world-data.js"></script>
   <script defer src="/effects.js"></script>
   <script defer src="/world.js"></script>
   <script defer src="/hq.js"></script>
   <script defer src="/app.js"></script>
+  <script defer src="/industrial.js"></script>
 </head>
 <body>
   <div class="ambient-grid" aria-hidden="true"></div>
@@ -30,8 +33,8 @@
       </div>
     </div>
     <div class="top-actions">
-      <button class="map-header-btn" id="hqOpenBtn" type="button">⌂ HOME BASE</button>
-      <button class="map-header-btn" id="mapOpenBtn" type="button">◈ WORLD MAP</button>
+      <button class="map-header-btn" id="hqOpenBtn" type="button">⌂ 工場を開く</button>
+      <button class="map-header-btn" id="mapOpenBtn" type="button">◈ 無限工業ワールド</button>
       <div class="server"><i id="connectionLight"></i><span id="connectionLabel">STANDBY</span></div>
       <button id="audioToggle" class="icon-btn" type="button" title="効果音をON/OFF" aria-label="効果音を切り替え">♪ <span>OFF</span></button>
       <label class="quality-select">演出
@@ -226,20 +229,118 @@
     </section>
   </div>
 
-  <div class="overlay is-visible" id="welcomeOverlay">
+  
+  <div class="overlay iw-overlay" id="industrialOverlay" role="dialog" aria-modal="true" aria-labelledby="iwTitle">
+    <div class="iw-shell">
+      <header class="iw-header">
+        <div class="iw-heading">
+          <span class="iw-serial">ROGUE FACTORY / AUTOMATION SURVIVAL</span>
+          <h2 id="iwTitle">INDUSTRIAL <em>WORLD</em></h2>
+        </div>
+        <div class="iw-global-stats">
+          <div><small>POWER</small><b id="iwPower">0 / 0 MW</b></div>
+          <div><small>FACTORY</small><b id="iwEntityCount">0 MACHINES</b></div>
+          <div><small>POLLUTION</small><b id="iwPollution">0</b></div>
+          <div class="iw-threat"><small>ENEMY RAID</small><b id="iwWave">準備中</b></div>
+        </div>
+        <button type="button" id="iwExit" class="iw-exit" title="ホームへ戻る">✕</button>
+      </header>
+      <div class="iw-inventory" id="iwInventory" aria-label="倉庫資源"></div>
+      <div class="iw-layout">
+        <aside class="iw-builder" aria-label="設備パレット">
+          <div class="iw-sidebar-header">
+            <span class="iw-eyebrow">// BUILD MENU</span><h3>工場設備</h3>
+            <p>設備を選んで、世界に配置</p>
+          </div>
+          <div id="iwCategories" class="iw-categories"></div>
+          <div class="iw-build-list" id="iwBuildList"></div>
+          <div class="iw-toolbox">
+            <button type="button" id="iwToolCursor" class="iw-tool-btn">↖ 選択</button>
+            <button type="button" id="iwToolRotate" class="iw-tool-btn">↻ 回転</button>
+            <button type="button" id="iwToolErase" class="iw-tool-btn">⌫ 撤去</button>
+            <button type="button" id="iwToolLine" class="iw-tool-btn">↝ ライン</button>
+          </div>
+          <div class="iw-sidebar-help">マウスホイール：拡大・縮小<br>ドラッグ：マップ移動<br>右クリック：向きを変更<br>ラインツール：ドラッグでベルトやパイプを一括敷設<br>タッチ：タップして建築・スワイプで移動</div>
+        </aside>
+        <div class="iw-center">
+          <div class="iw-map-top">
+            <div><span class="iw-online-dot"></span><strong>PERMANENT WORLD</strong><span class="iw-coordinates" id="iwCoords">X: 0 / Y: 0</span></div>
+            <div class="iw-map-actions">
+              <button id="iwCenter" type="button">⌖ 本拠地</button>
+              <button id="iwZoomOut" type="button" aria-label="縮小">−</button>
+              <span id="iwZoomLabel">100%</span>
+              <button id="iwZoomIn" type="button" aria-label="拡大">＋</button>
+            </div>
+          </div>
+          <div class="iw-canvas-wrap" id="iwCanvasWrap">
+            <canvas id="iwCanvas" tabindex="0" aria-label="無限に続く工業マップ"></canvas>
+            <div class="iw-selection-label" id="iwSelectionLabel">設備選択中：採掘機</div>
+            <div class="iw-status-banner" id="iwStatusBanner">採掘機から資源をベルトで運び、工場を拡張しよう</div>
+            <div class="iw-minimap-box">
+              <div>◈ FACTORY RADAR</div>
+              <canvas id="iwMini" width="172" height="120"></canvas>
+            </div>
+            <div class="iw-map-bottom"><span>32×32チャンクの手続き生成世界</span><span id="iwRadius">開拓半径: 24</span></div>
+          </div>
+          <div class="iw-quickbar">
+            <button id="iwExpand" type="button"><span>◈</span><b>土地を開拓</b><small id="iwExpandCost">◆30 / 鉄12</small></button>
+            <button id="iwToResearch" type="button"><span>⌬</span><b>研究・技術</b><small id="iwSciencePoints">研究 25 pt</small></button>
+            <button id="iwToMilitary" type="button"><span>✹</span><b>防衛・戦闘</b><small id="iwHostiles">敵機械 0体</small></button>
+            <button id="iwRaidMenu" type="button"><span>⚔</span><b>他プレイヤー</b><small>襲撃（おまけ）</small></button>
+          </div>
+        </div>
+        <aside class="iw-info">
+          <div class="iw-info-tabs">
+            <button type="button" class="active" data-iw-tab="overview">工場状況</button>
+            <button type="button" data-iw-tab="inspect">設備詳細</button>
+            <button type="button" data-iw-tab="research">研究</button>
+            <button type="button" data-iw-tab="combat">防衛</button>
+          </div>
+          <div class="iw-info-body" id="iwInfoBody"></div>
+          <div class="iw-event-log">
+            <strong>FACTORY EVENT LOG</strong>
+            <div id="iwEventLog">ワールド読み込み中...</div>
+          </div>
+        </aside>
+      </div>
+      <div class="iw-footer">
+        <span>⚙ 採掘 → ベルト → 精錬 → 組立 → 研究 → 兵器 → 防衛</span>
+        <span id="iwSaveStatus">NEON AUTOSAVE / 接続待機</span>
+      </div>
+    </div>
+  </div>
+  <div class="overlay iw-help-overlay" id="iwHelpOverlay" role="dialog" aria-modal="true">
+    <div class="iw-help-modal">
+      <div class="iw-eyebrow">// ENGINEER ACADEMY</div>
+      <h2>工業ワールドの遊び方</h2>
+      <p>ここはステージではなく、何度でも戻って拡張できる自分専用の工業世界です。建設した工場はサーバーに保存されます。</p>
+      <ol>
+        <li><b>鉱脈を探す</b>：マップの橙色の鉄鉱脈に採掘機を置きます。</li>
+        <li><b>ベルトでつなぐ</b>：採掘機 → コンベア → 電気炉 → コンベア → 組立機の順につなぐと素材が流れます。</li>
+        <li><b>レシピを選ぶ</b>：組立機を選択すると、弾薬・歯車・回路・研究パックなどを変更できます。</li>
+        <li><b>電力を管理する</b>：火力発電機に石炭を運び、電柱を設置すると遠くの設備にも電力を供給できます。</li>
+        <li><b>研究して拡張</b>：研究所で研究パックを処理し、新技術を解放。土地開拓でさらに遠くに工場を建てられます。</li>
+        <li><b>敵から守る</b>：汚染が増えると敵機械が接近します。砲台に弾薬を運び、壁やレーザーで防衛しましょう。</li>
+      </ol>
+      <p class="iw-help-note">工場の建設や生産は時間制限なし。ログアウトしても建物は消えません。</p>
+      <button type="button" id="iwHelpClose">工場の建設を始める</button>
+    </div>
+  </div>
+
+<div class="overlay is-visible" id="welcomeOverlay">
     <div class="modal welcome-modal">
       <span class="modal-kicker">// SYSTEM INITIALIZATION</span>
       <div class="welcome-icon">⌘</div>
       <h2>BUILD. AUTOMATE.<br><em>DESTROY.</em></h2>
-      <p>工場をつなぎ、弾薬を作り、敵のコアを破壊せよ。<br>3分間の工業ローグライクPvP。</p>
+      <p>無限に続く世界で、採掘・物流・発電・研究・戦車製造を自動化。<br>工場を拡張し続け、迫り来る機械獣から守り抜こう。</p>
       <label class="name-label" for="playerName">OPERATOR NAME</label>
       <input id="playerName" maxlength="20" placeholder="ENGINEER" value="ENGINEER" autocomplete="nickname">
       <div class="play-buttons">
-        <button id="hqStartBtn" class="play-primary world-primary" type="button">⌂ 恒久基地を開く <span>BUILD / INDUSTRY / TANKS</span></button>
-        <button id="worldBtn" class="play-secondary" type="button">◈ ワールドマップへ <span>CAMPAIGN / 24 STAGES</span></button>
-        <button id="tutorialBtn" class="play-secondary" type="button">◎ チュートリアル <span>FACTORY BASICS</span></button>
-        <button id="soloBtn" class="play-secondary" type="button">◉ フリーバトル <span>SOLO / TRAINING</span></button>
-        <button id="pvpBtn" class="play-secondary" type="button">⚔ 3分間の模擬PvP <span>OPTIONAL / 1 VS 1</span></button>
+        <button id="hqStartBtn" class="play-primary world-primary" type="button">⚙ 無限工業ワールドを始める <span>EXPAND / AUTOMATE / DEFEND</span></button>
+        <button id="worldBtn" class="play-secondary" type="button">◈ ワールドを探索する <span>ONE PERSISTENT WORLD</span></button>
+        <button id="tutorialBtn" class="play-secondary" type="button">◎ 工場の操作説明 <span>AUTOMATION GUIDE</span></button>
+        <button id="soloBtn" class="play-secondary" type="button">◉ 模擬防衛戦（旧モード） <span>OPTIONAL</span></button>
+        <button id="pvpBtn" class="play-secondary" type="button">⚔ 模擬PvP（旧モード） <span>OPTIONAL / 1 VS 1</span></button>
       </div>
       <p class="welcome-note">PC: クリックで設置 / 右クリックで設備回転　・　タッチ操作対応</p>
     </div>
