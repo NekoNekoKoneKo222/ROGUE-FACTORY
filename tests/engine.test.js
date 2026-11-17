@@ -17,7 +17,7 @@ test("new games have equal factory layouts and core health",()=>{
  assert.equal(g.ended,false);
 });
 test("factory actually mines, smelts, crafts ammo, and deals damage",()=>{
- const g=game();run(g,28);
+ const g=game();g.players[0].options=["mine","ammo","fire"];E.choose(g,0,"mine");run(g,28);
  assert.ok(g.players[0].stats.ore>0,"Mining should produce ore");
  assert.ok(g.players[0].stats.metal>0,"Furnace should produce metal");
  assert.ok(g.players[0].stats.ammo>0,"Ammo factory should manufacture bullets");
