@@ -111,3 +111,48 @@ test("client snapshots expose only serializable terrain seed, machinery and prog
  assert.ok(Array.isArray(s.enemies));
  assert.equal(typeof s.power.supply,"number");
 });
+
+test("dragged conveyor and pipe routes charge exact resource costs and connect their directions",()=>{
+ const {base,world}=fresh();
+ const before=world.warehouse.scrap;
+ const result=Industrial.command(base,{action:"line",machine:"belt",x:1,y:1,tx:4,ty:3});
+ assert.equal(result.ok,true);
+ assert.equal(result.built,6);
+ assert.equal(world.warehouse.scrap,before-6*2);
+ for(const pos of [[1,1],[2,1],[3,1],[4,1],[4,2],[4,3]])
+   assert.equal(world.entities[point(...pos)].type,"belt");
+ assert.equal(world.entities["4,1"].dir,2);
+ assert.equal(world.entities["4,3"].dir,2);
+});
+test("line-building is atomic if an occupied tile blocks the path",()=>{
+ const {base,world}=fresh();
+ const before=world.warehouse.scrap,initial=Object.keys(world.entities).length;
+ const result=Industrial.command(base,{action:"line",machine:"belt",x:-6,y:-3,tx:-1,ty:-3});
+ assert.equal(result.ok,false);
+ assert.equal(world.warehouse.scrap,before);
+ assert.equal(Object.keys(world.entities).length,initial);
+});
+test("oil can move from the pump through the pipe to the refinery",()=>{
+ const {base,world}=fresh();
+ world.research.unlocked.push("automation2","oilProcessing");
+ const pump=Industrial.makeEntity("oilPump",5,4,1);
+ const pipe=Industrial.makeEntity("pipe",6,4,1);
+ const refinery=Industrial.makeEntity("refinery",7,4,1);
+ pump.online=true;refinery.online=true;pipe.online=true;pump.fluid=4;
+ world.entities["5,4"]=pump;world.entities["6,4"]=pipe;world.entities["7,4"]=refinery;
+ Industrial.transport(world);
+ assert.equal(pipe.fluid,1,"Oil pump must feed adjacent pipe");
+ Industrial.transport(world);
+ assert.equal(refinery.fluid,1,"Pipe must feed adjacent refinery");
+});
+test("manufactured tanks can be dispatched as physical allied defenders",()=>{
+ const {base,world}=fresh();
+ world.research.unlocked.push("tanks");
+ world.warehouse.tank=2;
+ assert.equal(Industrial.command(base,{action:"dispatch",count:2}).ok,true);
+ assert.equal(world.warehouse.tank,0);
+ assert.equal(world.friendly.length,2);
+ world.enemies=[{id:1,x:3,y:4,type:"biter",hp:140,maxHp:140,cooldown:0}];
+ simulate(world,6);
+ assert.ok(world.enemies[0].hp<140 || world.stats.kills>0);
+});
