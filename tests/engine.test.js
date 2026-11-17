@@ -47,8 +47,8 @@ test("PvP forbids combat for precisely 180 seconds, then locks construction",()=
  assert.equal(g.buildTime,180);
  run(g,179.75);
  assert.equal(g.phase,"build");
- assert.equal(g.players[0].coreHp,400);
- assert.equal(g.players[1].coreHp,400);
+ assert.equal(g.players[0].coreHp,g.players[0].maxCoreHp,"No damage during PvP building time");
+ assert.equal(g.players[1].coreHp,g.players[1].maxCoreHp,"No damage during PvP building time");
  assert.equal(E.build(g,0,"wall",8,8).ok,true);
  run(g,.5);
  assert.equal(g.phase,"battle");
