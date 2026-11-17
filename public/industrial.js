@@ -14,7 +14,7 @@
   circuit:"⌘",ammoPack:"▣",sciencePack:"⌬",fuel:"◉",tank:"▰",ironOre:"⛏",plastic:"◉"};
  let transport=null,connected=false,wantsOpen=false,loading=false,ready=false,state=null;
  let defs={},costs={},recipes={},techs={},category="all",tool="drill",mode="build",dir=1,tab="overview";
- let selected=null,hover=null,camera={x:-2,y:-1},zoom=1,dpr=1,CW=800,CH=600;
+ let selected=null,hover=null,lineAnchor=null,camera={x:-2,y:-1},zoom=1,dpr=1,CW=800,CH=600;
  let mouse=null,moved=false,activePointers=new Map(),lastFrame=0,frames=0,lastMini=0,lastShot=0;
  let fxParticles=[],terrainCache=new Map(),lastPoll=0;
  const mobile=()=>window.matchMedia("(max-width:700px)").matches;
@@ -146,6 +146,7 @@
    $("iwToolCursor").classList.toggle("active",mode==="select");
    $("iwToolRotate").classList.toggle("active",mode==="rotate");
    $("iwToolErase").classList.toggle("active",mode==="erase");
+   $("iwToolLine").classList.toggle("active",mode==="line");
  }
  function renderPalette(){
    if(!ready)return;
@@ -460,7 +461,17 @@
    }
  }
  function paintCursor(timestamp){
-   const point=hover||selected;if(!point)return;
+   const point=hover||selected;
+   if(mode==="line" && point && (lineAnchor||mouse)){
+     const a=lineAnchor||(mouse?localToTile(mouse.startX,mouse.startY):point);
+     const s=cellSize(),sx=(a.x-camera.x)*s+CW/2,sy=(a.y-camera.y)*s+CH/2;
+     const mx=(point.x-camera.x)*s+CW/2,my=(point.y-camera.y)*s+CH/2;
+     ctx.save();ctx.strokeStyle="#ffdc85";ctx.lineWidth=Math.max(2,s*.16);
+     ctx.globalAlpha=.45;ctx.setLineDash([Math.max(3,s*.2),Math.max(2,s*.12)]);
+     ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(mx,sy);ctx.lineTo(mx,my);ctx.stroke();
+     ctx.setLineDash([]);ctx.restore();
+   }
+   if(!point)return;
    const s=cellSize(),x=(point.x-camera.x)*s+CW/2,y=(point.y-camera.y)*s+CH/2;
    const outside=Math.abs(point.x)>state.radius||Math.abs(point.y)>state.radius;
    ctx.save();ctx.strokeStyle=outside?"#fe7e79":"#ffdfa1";ctx.lineWidth=2;
@@ -524,7 +535,7 @@
    hover=localToTile(loc.x,loc.y);
    if(!mouse||e.pointerId!==mouse.id)return;
    if(Math.hypot(loc.x-mouse.startX,loc.y-mouse.startY)>6)moved=true;
-   if(moved){
+   if(moved && mode!=="line"){
      camera.x=mouse.origCamera.x-(loc.x-mouse.startX)/cellSize();
      camera.y=mouse.origCamera.y-(loc.y-mouse.startY)/cellSize();
      canvas.classList.add("is-dragging");
@@ -532,7 +543,17 @@
  });
  canvas.addEventListener("pointerup",e=>{
    const loc=locatePointer(e);
-   if(mouse?.id===e.pointerId && !moved && state){
+   if(mouse?.id===e.pointerId && mode==="line" && state){
+     const begin=lineAnchor||localToTile(mouse.startX,mouse.startY);
+     const end=localToTile(loc.x,loc.y);
+     if(begin.x===end.x&&begin.y===end.y && !lineAnchor){
+       lineAnchor=begin;
+       notice("開始点 "+begin.x+","+begin.y+" — 終点をタップするかドラッグしてください");
+     }else{
+       send("industry:action",{action:"line",machine:tool,x:begin.x,y:begin.y,tx:end.x,ty:end.y});
+       lineAnchor=null;
+     }
+   }else if(mouse?.id===e.pointerId && !moved && state){
      const point=localToTile(loc.x,loc.y);
      selected=point;hover=point;
      if(e.button===2){
@@ -588,6 +609,11 @@
  $("iwToolCursor").onclick=()=>{mode="select";updateTools();$("iwSelectionLabel").textContent="調査モード：設備を選択";};
  $("iwToolRotate").onclick=()=>{mode="rotate";updateTools();$("iwSelectionLabel").textContent="回転モード：設備をタップ";};
  $("iwToolErase").onclick=()=>{mode="erase";updateTools();$("iwSelectionLabel").textContent="撤去モード：設備をタップ";};
+ $("iwToolLine").onclick=()=>{
+   if(!["belt","pipe","pole","wall"].includes(tool))tool="belt";
+   mode="line";lineAnchor=null;updateTools();renderPalette();
+   $("iwSelectionLabel").textContent="ライン敷設：ドラッグか2回タップでコンベアを接続";
+ };
  document.querySelectorAll("[data-iw-tab]").forEach(b=>b.onclick=()=>switchTab(b.dataset.iwTab));
  function showHelp(){
    $("iwHelpOverlay").classList.add("is-visible");
