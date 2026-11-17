@@ -8,9 +8,11 @@
   <title>ROGUE FACTORY — INDUSTRIAL WARFARE</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/world.css">
+  <link rel="stylesheet" href="/hq.css">
   <script defer src="/world-data.js"></script>
   <script defer src="/effects.js"></script>
   <script defer src="/world.js"></script>
+  <script defer src="/hq.js"></script>
   <script defer src="/app.js"></script>
 </head>
 <body>
@@ -28,6 +30,7 @@
       </div>
     </div>
     <div class="top-actions">
+      <button class="map-header-btn" id="hqOpenBtn" type="button">⌂ HOME BASE</button>
       <button class="map-header-btn" id="mapOpenBtn" type="button">◈ WORLD MAP</button>
       <div class="server"><i id="connectionLight"></i><span id="connectionLabel">STANDBY</span></div>
       <button id="audioToggle" class="icon-btn" type="button" title="効果音をON/OFF" aria-label="効果音を切り替え">♪ <span>OFF</span></button>
@@ -139,6 +142,90 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+
+  <div class="overlay headquarters-overlay" id="hqOverlay" role="dialog" aria-modal="true" aria-labelledby="hqTitle">
+    <section class="hq-shell">
+      <header class="hq-header">
+        <div class="hq-identity">
+          <span class="section-caption">// PERSISTENT HOME BASE</span>
+          <h2 id="hqTitle">HOME <em>FACTORY</em></h2>
+          <p>工場を拡張し、戦車を生産し、世界を制圧しよう。基地は戦闘後も残ります。</p>
+        </div>
+        <div class="hq-header-right">
+          <div class="hq-owner"><span>COMMANDER</span><b id="hqPlayer">ENGINEER</b></div>
+          <button id="hqReturnBtn" class="hq-close" type="button" aria-label="ホームメニュー">✕</button>
+        </div>
+      </header>
+      <div class="hq-resources" aria-live="polite">
+        <div><span>◆ SCRAP</span><strong id="hqScrap">0</strong></div>
+        <div><span>⛏ ORE</span><strong id="hqOre">0</strong></div>
+        <div><span>▣ METAL</span><strong id="hqMetal">0</strong></div>
+        <div><span>⚙ AMMO</span><strong id="hqAmmo">0</strong></div>
+        <div><span>▰ TANKS</span><strong id="hqTanks">0</strong></div>
+        <div><span>✷ ARTILLERY</span><strong id="hqArtillery">0</strong></div>
+      </div>
+      <div class="hq-layout">
+        <section class="hq-main">
+          <div class="hq-subheader">
+            <div><span class="section-caption">// YOUR OWN BASE</span><h3>恒久工場</h3></div>
+            <div class="hq-core"><span>HQ INTEGRITY</span><b id="hqHealth">500 / 500</b><div class="core-bar"><i id="hqHealthBar"></i></div></div>
+          </div>
+          <div class="hq-grid-wrap"><div class="hq-grid" id="hqGrid" role="grid" aria-label="恒久工場の配置"></div></div>
+          <div class="hq-selected" id="hqSelected">建築する設備を選択して、空きマスをタップしてください。</div>
+          <div class="hq-palette" id="hqPalette"></div>
+          <div class="hq-edit-actions">
+            <button id="hqRotate" type="button">↻ 向きを変える</button>
+            <button id="hqUpgrade" type="button">↑ アップグレード</button>
+            <button id="hqDemolish" type="button">⌫ 解体</button>
+            <button id="hqRepair" type="button">✚ 基地を修理</button>
+          </div>
+          <div class="hq-production" id="hqProduction">⛏ 採掘 → ベルト → 精錬 → ベルト → 弾薬工場 とつないで資材を自動生産。</div>
+        </section>
+        <aside class="hq-sidebar">
+          <div class="hq-tabs" role="tablist" aria-label="基地メニュー">
+            <button type="button" class="active" data-hq-tab="army">▰ 兵器</button>
+            <button type="button" data-hq-tab="raid">⚔ 襲撃</button>
+            <button type="button" data-hq-tab="log">◈ 戦報</button>
+          </div>
+          <div class="hq-panel" id="hqArmyPanel">
+            <div class="hq-panel-title">兵器製造ライン <small>WAR INDUSTRY</small></div>
+            <div class="hq-unit">
+              <div class="hq-unit-icon">▰</div><div class="hq-unit-info"><b>主力戦車</b><small>金属28 / 弾薬14 / スクラップ22</small><small>戦車工場が必要</small></div>
+              <button type="button" id="hqBuildTank">製造</button>
+            </div>
+            <div class="hq-unit">
+              <div class="hq-unit-icon">✷</div><div class="hq-unit-info"><b>自走砲</b><small>金属48 / 弾薬28 / スクラップ40</small><small>戦車工場Lv.2で解放</small></div>
+              <button type="button" id="hqBuildArtillery">製造</button>
+            </div>
+            <div class="hq-panel-title">製造予約 <small>PRODUCTION QUEUE</small></div>
+            <div id="hqQueue" class="hq-list">現在生産中の兵器はありません。</div>
+            <div class="hq-info">工場を増設して、生産ラインを強化。戦車は敵の襲撃を迎撃し、ワールド探索を支援します。</div>
+          </div>
+          <div class="hq-panel" id="hqRaidPanel" hidden>
+            <div class="hq-panel-title">他プレイヤーの基地 <small>PLAYER INVASIONS</small></div>
+            <p class="hq-info">他の指揮官の常設基地に戦車部隊を派遣します。敵の基地は破壊されず、襲撃後に防衛シールドが発生します。</p>
+            <div class="hq-raid-config"><label>出撃部隊 <select id="hqRaidUnit"><option value="tank">▰ 主力戦車</option><option value="artillery">✷ 自走砲</option></select></label>
+              <label>投入台数 <select id="hqRaidCount"><option value="1">1台</option><option value="3">3台</option><option value="5">5台</option><option value="10">10台</option><option value="20">20台</option></select></label></div>
+            <button id="hqRefreshTargets" class="hq-action-wide" type="button">⌕ 攻撃可能な基地を検索</button>
+            <div class="hq-list" id="hqTargets">攻撃できる基地を検索します。</div>
+            <div class="hq-raid-results" id="hqRaidResult" hidden></div>
+          </div>
+          <div class="hq-panel" id="hqLogPanel" hidden>
+            <div class="hq-panel-title">最近の戦報 <small>ATTACK HISTORY</small></div>
+            <p class="hq-info">自分が攻めた戦闘・他のプレイヤーから受けた攻撃を確認できます。</p>
+            <div id="hqHistory" class="hq-list">まだ戦闘履歴がありません。</div>
+            <div class="hq-protection"><span>防衛シールド</span><b id="hqShield">なし</b></div>
+          </div>
+          <div class="hq-home-actions">
+            <button id="hqToWorld" type="button" class="hq-primary">◈ 大きなワールドマップへ</button>
+            <button id="hqToDefense" type="button" class="hq-secondary">⚠ 防衛出撃 / ステージへ</button>
+          </div>
+        </aside>
+      </div>
+      <footer class="hq-footer"><span>永久保存：Neon PostgreSQL　│　基地が攻撃されても建物は消滅しません</span><span>▲ 鉱脈マスに採掘機を配置</span></footer>
+    </section>
+  </div>
+
   <div class="overlay is-visible" id="welcomeOverlay">
     <div class="modal welcome-modal">
       <span class="modal-kicker">// SYSTEM INITIALIZATION</span>
@@ -148,10 +235,11 @@
       <label class="name-label" for="playerName">OPERATOR NAME</label>
       <input id="playerName" maxlength="20" placeholder="ENGINEER" value="ENGINEER" autocomplete="nickname">
       <div class="play-buttons">
-        <button id="worldBtn" class="play-primary world-primary" type="button">◈ ワールドマップへ <span>CAMPAIGN / 24 STAGES</span></button>
+        <button id="hqStartBtn" class="play-primary world-primary" type="button">⌂ 恒久基地を開く <span>BUILD / INDUSTRY / TANKS</span></button>
+        <button id="worldBtn" class="play-secondary" type="button">◈ ワールドマップへ <span>CAMPAIGN / 24 STAGES</span></button>
         <button id="tutorialBtn" class="play-secondary" type="button">◎ チュートリアル <span>FACTORY BASICS</span></button>
         <button id="soloBtn" class="play-secondary" type="button">◉ フリーバトル <span>SOLO / TRAINING</span></button>
-        <button id="pvpBtn" class="play-secondary" type="button">⚔ オンライン対戦 <span>1 VS 1 MATCHMAKING</span></button>
+        <button id="pvpBtn" class="play-secondary" type="button">⚔ 3分間の模擬PvP <span>OPTIONAL / 1 VS 1</span></button>
       </div>
       <p class="welcome-note">PC: クリックで設置 / 右クリックで設備回転　・　タッチ操作対応</p>
     </div>
