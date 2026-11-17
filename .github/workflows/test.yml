@@ -1,0 +1,21 @@
+name: Verify game
+on:
+  push:
+    branches: [main, feat/playable-factory-mvp]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Check syntax
+        run: |
+          node --check server.js
+          node --check game/engine.js
+          node --check public/app.js
+          node --check public/effects.js
+      - run: npm test
