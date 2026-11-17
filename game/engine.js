@@ -207,7 +207,7 @@ function botAction(game,dt) {
   const p=game.players[1];if(!p.bot || game.ended)return;
   if(p.options.length)choose(game,1,p.options[Math.floor(Math.random()*p.options.length)]);
   // Build an additional complete production chain, then reinforce its defense.
-  const plan=[[1,3,"drill"],[2,3,"belt"],[3,3,"furnace"],[4,3,"belt"],[5,3,"ammo"],[6,3,"turret"],[0,5,"generator"],[6,5,"wall"],[4,5,"shield"],[0,4,"generator"]];
+  const plan=[[0,4,"generator"],[1,3,"drill"],[2,3,"belt"],[3,3,"furnace"],[4,3,"belt"],[5,3,"ammo"],[6,3,"turret"],[0,5,"generator"],[6,5,"wall"],[4,5,"shield"]];
   p.aiStep=Math.min(p.aiStep,plan.length);
   const next=plan[p.aiStep];
   if(next && p.scrap>=costFor(p,next[2]) && (p.powerUsed<p.powerTotal || next[2]==="generator")){
