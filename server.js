@@ -8,12 +8,14 @@ const { WebSocketServer, WebSocket } = require("ws");
 const { Pool } = require("pg");
 const engine = require("./game/engine");
 const WorldData = require("./public/world-data.js");
+const Headquarters = require("./game/headquarters");
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = path.resolve(__dirname, "public");
 const MIME = {".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".png":"image/png",".svg":"image/svg+xml",".ico":"image/x-icon"};
 const pool = process.env.DATABASE_URL ? new Pool({connectionString:process.env.DATABASE_URL,max:3,connectionTimeoutMillis:5000}) : null;
 const games = new Map();
+const homeApi = pool ? Headquarters.api(pool) : null;
 let waiting = null;
 
 const server = http.createServer((req,res)=>{
@@ -80,14 +82,76 @@ function startGame(sockets,players,options={}){
     }
   },250);
 }
+async function handleHome(ws,msg){
+  if(!msg.type?.startsWith("home:"))return false;
+  if(!homeApi){send(ws,{type:"home:error",message:"基地保存サーバーが準備できていません"});return true;}
+  const type=msg.type;
+  if(type==="home:login"){
+    if(ws.accountId){send(ws,{type:"home:error",message:"この接続ではすでにログインしています"});return true;}
+    const profile=msg.token ? await homeApi.getToken(msg.token) : await homeApi.newAccount(safeName(msg.name));
+    if(!profile){send(ws,{type:"home:error",message:"基地の認証情報が無効です"});return true;}
+    ws.accountId=profile.id;
+    const fresh=await homeApi.mutate(ws.accountId,()=>({ok:true}));
+    send(ws,{type:"home:welcome",token:msg.token||profile.token,
+      id:profile.id,name:profile.name,base:fresh.base,
+      buildings:Headquarters.TYPES,units:Headquarters.UNITS,
+      oreSites:[...Headquarters.ORES]});
+    return true;
+  }
+  if(!ws.accountId){send(ws,{type:"home:error",message:"基地にログインしてください"});return true;}
+  if(type==="home:load"){
+    const result=await homeApi.mutate(ws.accountId,()=>({ok:true}));
+    const [targets,history]=await Promise.all([homeApi.targets(ws.accountId),homeApi.history(ws.accountId)]);
+    send(ws,{type:"home:state",base:result.base,targets,history});
+    return true;
+  }
+  if(type==="home:action"){
+    const result=await homeApi.mutate(ws.accountId,base=>Headquarters.modify(base,msg));
+    if(result.ok)send(ws,{type:"home:state",base:result.base,notice:"設備または兵器を更新しました"});
+    else send(ws,{type:"home:error",message:result.error});
+    return true;
+  }
+  if(type==="home:raid"){
+    if(!Number.isInteger(msg.count)||typeof msg.targetId!=="string") {
+      send(ws,{type:"home:error",message:"攻撃内容が不正です"});return true;
+    }
+    const result=await homeApi.attack(ws.accountId,msg.targetId,msg.unit,msg.count);
+    if(!result.ok){send(ws,{type:"home:error",message:result.error});return true;}
+    send(ws,{type:"home:raid-result",result:{
+      victory:result.victory,attack:result.attack,defense:result.defense,loot:result.loot,
+      casualties:result.casualties,count:result.count,returned:result.returned,defenderName:result.defenderName
+    }});
+    const [targets,history]=await Promise.all([homeApi.targets(ws.accountId),homeApi.history(ws.accountId)]);
+    send(ws,{type:"home:state",base:result.attacker,targets,history});
+    for(const online of wss.clients){
+      if(online.accountId!==msg.targetId || online.readyState!==WebSocket.OPEN)continue;
+      send(online,{type:"home:raided",attackerName:result.attackerName,victory:result.victory,loot:result.loot});
+      send(online,{type:"home:state",base:result.defender});
+    }
+    return true;
+  }
+  send(ws,{type:"home:error",message:"不明な基地操作です"});
+  return true;
+}
 wss.on("connection",ws=>{
-  ws.id=crypto.randomUUID();ws.name="ENGINEER";ws.isAlive=true;
+  ws.id=crypto.randomUUID();ws.name="ENGINEER";ws.isAlive=true;ws.accountId=null;
+  ws.msgWindow=Date.now();ws.msgCount=0;
   ws.on("pong",()=>{ws.isAlive=true;});
   send(ws,{type:"hello",message:"ROGUE FACTORY ONLINE"});
-  ws.on("message",raw=>{
+  ws.on("message",async raw=>{
     let msg;
     try{msg=JSON.parse(String(raw));}catch{return;}
     if(!msg || typeof msg!=="object")return;
+    const now=Date.now();
+    if(now-ws.msgWindow>1000){ws.msgWindow=now;ws.msgCount=0;}
+    if(++ws.msgCount>24){send(ws,{type:"home:error",message:"操作が速すぎます"});return;}
+    if(msg.type?.startsWith("home:")){
+      try{await handleHome(ws,msg);}catch(e){
+        console.error("HQ operation failed:",e.message);
+        send(ws,{type:"home:error",message:"基地の処理に失敗しました"});
+      }
+      return;
+    }
     if(msg.type==="join"){
       if(ws.match || ws===waiting)return;
       ws.name=safeName(msg.name);
@@ -98,7 +162,14 @@ wss.on("connection",ws=>{
         const stage=Object.hasOwn(WorldData.byId,stageId)?WorldData.byId[stageId]:null;
         if(!stage){send(ws,{type:"error",message:"不明なワールドステージです"});return;}
         // Stage modifiers are looked up server-side, never accepted from clients.
-        startGame([ws],[{id:ws.id,name:ws.name},{id:"cpu-"+crypto.randomUUID(),name:"ENEMY / "+stage.name,bot:true}],{stage});
+        let homeBase=null;
+        if(homeApi&&ws.accountId){
+          try{
+            const result=await homeApi.mutate(ws.accountId,()=>({ok:true}));
+            homeBase=result.base;
+          }catch(e){console.error("Unable to load HQ for mission:",e.message);}
+        }
+        startGame([ws],[{id:ws.id,name:ws.name},{id:"cpu-"+crypto.randomUUID(),name:"ENEMY / "+stage.name,bot:true}],{stage,homeBase});
       }else if(msg.mode==="pvp"){
         if(waiting && waiting.readyState===WebSocket.OPEN && waiting!==ws){
           const partner=waiting;waiting=null;
