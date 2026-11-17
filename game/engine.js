@@ -330,7 +330,9 @@ function step(game,dt=0.25) {
     processEnemies(game,dt);
   }
   if(game.mode!=="pvp" && game.wave===game.maxWaves && game.enemies.length===0){
-    game.ended=true;game.winner=game.players[0].coreHp>0?game.players[0].id:game.players[1].id;
+    game.ended=true;
+    const success=game.players[0].coreHp>0 && (game.stageId!=="tutorial" || game.players[0].stats.damage>0);
+    game.winner=success?game.players[0].id:game.players[1].id;
     game.finishReason=game.players[0].coreHp>0?"defense":"core";
     return game;
   }
