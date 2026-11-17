@@ -102,8 +102,8 @@ function makeState(base){
       gear:28,circuit:20,ammoPack:24,plastic:0,sciencePack:0,ironOre:0,copperOre:0,fuel:0
     },research:{points:25,unlocked:[],totalSpent:0},
     stats:{mined:0,crafted:0,shipped:0,kills:0,waves:0,damage:0},
-    pollution:0,waveAt:Date.now()+70000,wave:0,enemies:[],
-    rates:{},lastAt:Date.now(),tickNumber:0,lastOffline:0,log:[],
+    pollution:0,waveAt:Date.now()+70000,wave:0,enemies:[],friendly:[],
+    rates:{mined:0,crafted:0,shipped:0},rateSample:{mined:0,crafted:0,shipped:0},lastAt:Date.now(),tickNumber:0,lastOffline:0,log:[],
     worldLevel:1,expansions:0
   };
 }
@@ -192,22 +192,44 @@ function power(w,dt){
   }
   const pri={turret:0,laser:0,repair:1,generator:0,radar:2,drill:3,furnace:3,assembler:3,lab:4,tankPlant:4};
   const consumers=entries.filter(e=>!["generator","pole","solar","accumulator","core","belt","splitter","chest","wall","pipe"].includes(e.type));
+  for(const group of groups.values()){
+    group.storages=group.nodes.filter(e=>e.type==="accumulator");
+    group.reserve=group.storages.reduce((total,e)=>total+Math.min(30,e.charge||0),0);
+  }
   consumers.sort((a,b)=>(pri[a.type]??3)-(pri[b.type]??3));
   for(const e of consumers){
     const group=networkOf(e),use=DEFINITIONS[e.type].power||0;
     if(group)group.demand+=use;
-    e.online=!!group && (group.supply-group.used)>=use;
+    e.online=!!group && (group.supply+group.reserve-group.used)>=use;
     if(e.online)group.used+=use;
   }
-  let supply=0,demand=0,used=0;
-  for(const group of groups.values()){supply+=group.supply;demand+=group.demand;used+=group.used;}
-  return {supply:Math.round(supply),demand:Math.round(demand),used:Math.round(used),networks:groups.size};
+  let supply=0,demand=0,used=0,stored=0;
+  for(const group of groups.values()){
+    let difference=group.supply-group.used;
+    if(difference>=0){
+      for(const e of group.storages){
+        const amount=Math.min(20,difference,1000-(e.charge||0));
+        if(amount>0){e.charge=(e.charge||0)+amount;difference-=amount;}
+      }
+    }else{
+      let needed=-difference;
+      for(const e of group.storages){
+        const amount=Math.min(30,e.charge||0,needed);
+        e.charge=(e.charge||0)-amount;needed-=amount;
+        if(needed<=0)break;
+      }
+    }
+    stored+=group.storages.reduce((total,e)=>total+(e.charge||0),0);
+    supply+=group.supply;demand+=group.demand;used+=group.used;
+  }
+  return {supply:Math.round(supply),demand:Math.round(demand),used:Math.round(used),
+    stored:Math.round(stored),networks:groups.size};
 }
 function transport(w){
   const all=Object.values(w.entities),from=new Map(all.map(e=>[key(e.x,e.y),e]));
   // Snapshot planning ensures at most one belt hop per simulation tick.
   const steps=[];
-  const carriers=all.filter(e=>e.hp>0 && (e.type==="belt"||e.type==="splitter"||e.type==="chest"||e.type==="inserter"||e.type==="pipe"));
+  const carriers=all.filter(e=>e.hp>0 && (e.type==="belt"||e.type==="splitter"||e.type==="chest"||e.type==="inserter"||e.type==="pipe"||e.type==="oilPump"));
   for(const e of carriers){
     if(e.type==="belt"&&e.item){
       steps.push({e,item:e.item,to:from.get(target(e)),kind:"belt"});
@@ -221,7 +243,7 @@ function transport(w){
       const d=DIRS[e.dir],src=from.get(key(e.x-d[0],e.y-d[1])),dst=from.get(target(e));
       const item=src?.item || src?.output?.[0] || Object.keys(src?.input||{}).find(k=>src.input[k]>0);
       if(item)steps.push({e,item,to:dst,kind:"inserter",src});
-    }else if(e.type==="pipe" && e.fluid>=1){
+    }else if((e.type==="pipe"||e.type==="oilPump") && e.fluid>=1){
       const dest=from.get(target(e));
       if(dest && ["pipe","refinery"].includes(dest.type) && (dest.fluid||0)<20){
         steps.push({e,kind:"fluid",to:dest,item:"crude"});
@@ -322,6 +344,24 @@ function craft(w,dt,powerStatus){
 }
 function combat(w,dt){
   const entries=Object.values(w.entities),core=w.entities["0,0"];
+  // Manufactured tanks can be dispatched from the warehouse to protect the real world.
+  for(const tank of (w.friendly||[])){
+    tank.cooldown=Math.max(0,(tank.cooldown||0)-dt);
+    const nearby=w.enemies.filter(e=>e.hp>0).sort((a,b)=>dist(tank,a)-dist(tank,b))[0];
+    if(!nearby){
+      const home=Math.sqrt(tank.x*tank.x+tank.y*tank.y);
+      if(home>8){tank.x-=tank.x/home*dt;tank.y-=tank.y/home*dt;}
+      continue;
+    }
+    const range=dist(tank,nearby);
+    if(range>4){
+      const dx=nearby.x-tank.x,dy=nearby.y-tank.y,sum=Math.max(1,Math.abs(dx)+Math.abs(dy));
+      tank.x+=(dx/sum)*dt*1.45;tank.y+=(dy/sum)*dt*1.45;
+    }else if(tank.cooldown<=0){
+      nearby.hp-=26;tank.cooldown=2.2;
+      w.lastShot={from:[tank.x,tank.y],to:[nearby.x,nearby.y],at:Date.now(),kind:"tank"};
+    }
+  }
   const turrets=entries.filter(e=>e.hp>0 && e.online && ["turret","laser"].includes(e.type));
   for(const t of turrets){
     t.cooldown=Math.max(0,(t.cooldown||0)-dt);
@@ -341,6 +381,11 @@ function combat(w,dt){
     if(e.hp<=0)continue;
     e.cooldown=Math.max(0,(e.cooldown||0)-dt);
     let closest=core,nearest=999;
+    const guard=(w.friendly||[]).find(t=>dist(e,t)<1.5&&t.hp>0);
+    if(guard){
+      if(e.cooldown<=0){guard.hp=Math.max(0,guard.hp-8);e.cooldown=2.5;}
+      continue;
+    }
     // Intruders advance toward the permanent HQ, attacking intervening structures.
     for(const m of entries){
       if(m.hp<=0)continue;
@@ -371,6 +416,7 @@ function combat(w,dt){
     else alive.push(enemy);
   }
   w.enemies=alive;
+  w.friendly=(w.friendly||[]).filter(t=>t.hp>0);
 }
 function spawn(w,now){
   const count=Math.min(10,2+Math.floor(w.wave/2)+Math.floor(w.pollution/90));
@@ -399,6 +445,13 @@ function step(w,now,dt=1){
   if(now>=w.waveAt)spawn(w,now);
   combat(w,dt);
   w.lastPower=pow;
+  if(w.tickNumber%10===0){
+    const last=w.rateSample||{mined:0,crafted:0,shipped:0};
+    w.rates={mined:Math.max(0,(w.stats.mined-last.mined)*6),
+      crafted:Math.max(0,(w.stats.crafted-last.crafted)*6),
+      shipped:Math.max(0,(w.stats.shipped-last.shipped)*6)};
+    w.rateSample={mined:w.stats.mined,crafted:w.stats.crafted,shipped:w.stats.shipped};
+  }
 }
 function advance(w,now=Date.now()){
   if(!w.lastAt || !Number.isFinite(w.lastAt)){w.lastAt=now;return w;}
@@ -489,6 +542,22 @@ function command(base,msg,now=Date.now()){
     addLog(w,"工場敷地を拡張：半径 "+w.radius+" タイル");
     return {ok:true};
   }
+  if(kind==="dispatch"){
+    const count=Number(msg.count||1);
+    if(!Number.isInteger(count)||count<1||count>5)return {ok:false,error:"出撃台数は1〜5台です"};
+    if(!unlocked(w,"tanks"))return {ok:false,error:"戦車工業の研究が必要です"};
+    const available=countResources(w.warehouse,"tank")+(base.army?.tank||0);
+    if(available<count)return {ok:false,error:"製造済み戦車が足りません"};
+    if((w.friendly||[]).length+count>30)return {ok:false,error:"出撃中の戦車が多すぎます"};
+    w.friendly=w.friendly||[];
+    const fromStore=Math.min(countResources(w.warehouse,"tank"),count);
+    w.warehouse.tank=(w.warehouse.tank||0)-fromStore;
+    if(count>fromStore)base.army.tank-=count-fromStore;
+    for(let i=0;i<count;i++)w.friendly.push({id:"tank-"+Date.now()+"-"+i,
+      x:(i%3)-1,y:2+Math.floor(i/3),hp:120,maxHp:120,cooldown:0});
+    addLog(w,"自動戦車 "+count+"台が防衛出撃");
+    return {ok:true};
+  }
   if(kind==="research"){
     const tech=TECHS[msg.tech];
     if(!tech)return {ok:false,error:"研究がありません"};
@@ -513,8 +582,10 @@ function snapshot(base){
     entities:w.entities,warehouse:w.warehouse,research:w.research,stats:w.stats,
     power:w.lastPower||{supply:0,demand:0,used:0,networks:0},
     pollution:Math.round(w.pollution),wave:w.wave,waveIn:Math.max(0,Math.ceil((w.waveAt-Date.now())/1000)),
-    enemies:w.enemies,lastShot:w.lastShot||null,log:w.log,expansions:w.expansions,
-    army:base.army||{tank:0,artillery:0},hphq:base.hp,worldLevel:w.worldLevel,
+    enemies:w.enemies,friendly:w.friendly||[],lastShot:w.lastShot||null,log:w.log,expansions:w.expansions,
+    rates:w.rates||{mined:0,crafted:0,shipped:0},
+    army:{tank:(base.army?.tank||0)+countResources(w.warehouse,"tank"),
+      artillery:base.army?.artillery||0},hphq:base.hp,worldLevel:w.worldLevel,
     machineCount:Object.keys(w.entities).length};
 }
 module.exports={COST,DEFINITIONS,RECIPES,TECHS,ensure,makeState,makeEntity,advance,command,snapshot,tileAt,step,power,transport,craft};
