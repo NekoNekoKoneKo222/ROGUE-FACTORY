@@ -37,7 +37,7 @@
 .iw-build-item .iw-bitem-data{min-width:0;display:flex;flex-direction:column;gap:4px}
 .iw-build-item b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iw-build-item small{color:#ddb886;font:700 10px 'Chakra Petch',sans-serif;overflow-wrap:anywhere}
-.iw-toolbox{border-top:1px solid #365665;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:8px;flex-shrink:0}
+.iw-toolbox{border-top:1px solid #365665;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:8px;flex-shrink:0}
 .iw-tool-btn{background:#183541;border:1px solid #43616f;color:#c5e3e3;font-size:10px;padding:9px 3px;white-space:nowrap}
 .iw-tool-btn.active{border-color:#71f3dc;background:#225764;color:#e3fff8}
 .iw-sidebar-help{flex-shrink:0;padding:9px 13px 13px;font-size:9px;line-height:1.8;color:#7393a4}
