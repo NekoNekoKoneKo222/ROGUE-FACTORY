@@ -10,8 +10,10 @@ async function main(){
  }
  const pool=new Pool({connectionString:process.env.DATABASE_URL,max:1});
  try{
-  const sql=fs.readFileSync(path.join(__dirname,"../sql/001_initial.sql"),"utf8");
-  await pool.query(sql);
+  for(const file of ["001_initial.sql","002_headquarters.sql"]){
+    const sql=fs.readFileSync(path.join(__dirname,"../sql",file),"utf8");
+    await pool.query(sql);
+  }
   console.log("ROGUE FACTORY schema is up to date.");
  }finally{await pool.end();}
 }

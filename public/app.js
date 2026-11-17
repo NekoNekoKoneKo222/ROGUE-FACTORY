@@ -1,9 +1,9 @@
 "use strict";
 (()=>{
-const $=id=>document.getElementById(id),FX=window.FactoryFX;
-const icons={core:"◆",generator:"ϟ",drill:"⛏",belt:"➜",furnace:"♨",ammo:"⚙",turret:"✹",rocket:"➤",wall:"▦",shield:"◈",repair:"✚"};
-const desc={generator:"発電機：工場に電力を供給。",drill:"採掘機：鉱石を掘り、矢印の方向へ出力。",belt:"コンベア：アイテムを隣の設備へ輸送。",furnace:"精錬機：鉱石から金属を作成。",ammo:"弾薬工場：金属から弾薬を製造。",turret:"機関砲：弾薬を使い敵を撃つ。",rocket:"ミサイル：弾薬を2つ消費し大ダメージ。",wall:"装甲壁：敵のミサイルから工場を守る。",shield:"シールド：コアへのダメージを軽減。",repair:"修復機：金属を消費して設備を修理。"};
-const order=["generator","drill","belt","furnace","ammo","turret","rocket","wall","shield","repair"];
+const $=id=>document.getElementById(id),FX=window.FactoryFX,SIZE=12,CORE_IDX=10*SIZE+5;
+const icons={core:"◆",generator:"ϟ",drill:"⛏",belt:"➜",furnace:"♨",ammo:"⚙",turret:"✹",rocket:"➤",wall:"▦",shield:"◈",repair:"✚",tankPlant:"▣"};
+const desc={generator:"発電機：工場に電力を供給。",drill:"採掘機：鉱石を掘り、矢印の方向へ出力。",belt:"コンベア：アイテムを隣の設備へ輸送。",furnace:"精錬機：鉱石から金属を作成。",ammo:"弾薬工場：金属から弾薬を製造。",turret:"機関砲：弾薬を使い敵を撃つ。",rocket:"ミサイル：弾薬を2つ消費し大ダメージ。",wall:"装甲壁：敵のミサイルから工場を守る。",shield:"シールド：コアへのダメージを軽減。",repair:"修復機：金属を消費して設備を修理。",tankPlant:"戦車工場：恒久基地の製造設備。兵器は基地メニューで製造。"};
+const order=["generator","drill","belt","furnace","ammo","turret","rocket","wall","shield","repair","tankPlant"];
 let ws=null,defs={},upgradeDefs=[],state=null,meIndex=0,selection="drill",selectedCell=null,mode=null,playing=false,lastUpgrade="",toastTimer,retryTimer;
 $("playerName").value=localStorage.getItem("rf-name")||"ENGINEER";
 const stored=localStorage.getItem("rf-effects")||FX.quality;
@@ -23,15 +23,16 @@ function connect(){
  if(ws&&(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING))return;
  ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host);
  $("connectionLabel").textContent="CONNECTING";
- ws.onopen=()=>{$("connectionLabel").textContent="ONLINE";$("connectionLight").classList.add("online");clearTimeout(retryTimer);};
+ ws.onopen=()=>{$("connectionLabel").textContent="ONLINE";$("connectionLight").classList.add("online");clearTimeout(retryTimer);window.RogueHQ?.onConnected(send);};
  ws.onclose=()=>{
   $("connectionLabel").textContent="OFFLINE";$("connectionLight").classList.remove("online");
-  playing=false;state=null;mode=null;document.body.classList.remove("playing");overlay("welcomeOverlay");
+  playing=false;state=null;mode=null;document.body.classList.remove("playing");window.RogueHQ?.onDisconnected();overlay("welcomeOverlay");
   retryTimer=setTimeout(connect,2200);
  };
  ws.onerror=()=>{$("connectionLabel").textContent="ERROR";};
  ws.onmessage=e=>{
   let msg;try{msg=JSON.parse(e.data)}catch{return}
+  if(msg.type?.startsWith("home:")){window.RogueHQ?.receive(msg);return;}
   if(msg.type==="start"){
    defs=msg.definitions;upgradeDefs=msg.upgrades;meIndex=msg.playerIndex;state=null;playing=true;mode=null;
    lastUpgrade="";document.body.classList.add("playing");makeTools();overlay(null);notify("対戦開始！工場を建設しよう");
@@ -44,20 +45,22 @@ function connect(){
   }
  };
 }
-function join(nextMode){
+function join(nextMode,stageId){
  const name=$("playerName").value.trim().slice(0,20)||"ENGINEER";
  localStorage.setItem("rf-name",name);mode=nextMode;
- if(send({type:"join",name,mode:nextMode})){overlay("queueOverlay");$("gameModeLabel").textContent=nextMode==="solo"?"SINGLEPLAYER / CPU":"RANKED / ONLINE";}
+ if(send({type:"join",name,mode:nextMode,stageId})){overlay("queueOverlay");$("gameModeLabel").textContent=nextMode==="world"?"WORLD / FACTORY DEFENSE":nextMode==="solo"?"DEFENSE / FREE PLAY":"PVP / 3 MINUTE BUILD PHASE";}
 }
 $("soloBtn").onclick=()=>join("solo");
 $("pvpBtn").onclick=()=>join("pvp");
+window.addEventListener("rogue-world-play",e=>join("world",e.detail?.stageId));
+window.addEventListener("rogue-select-tool",e=>{if(e.detail?.type)selectTool(e.detail.type);});
 $("cancelQueueBtn").onclick=()=>{send({type:"cancel"});mode=null;overlay("welcomeOverlay");};
 $("rematchBtn").onclick=()=>{state=null;playing=false;document.body.classList.remove("playing");overlay("welcomeOverlay");};
 const getCell=(id,i)=>$(id).children[i]||null;
 function makeGrid(id,isMine){
  const grid=$(id);grid.replaceChildren();
- for(let i=0;i<64;i++){
-  const el=document.createElement("button");el.className="tile";el.type="button";el.dataset.i=i;el.dataset.x=i%8;el.dataset.y=Math.floor(i/8);
+ for(let i=0;i<SIZE*SIZE;i++){
+  const el=document.createElement("button");el.className="tile";el.type="button";el.dataset.i=i;el.dataset.x=i%SIZE;el.dataset.y=Math.floor(i/SIZE);
   el.disabled=!isMine;el.setAttribute("role","gridcell");el.setAttribute("aria-label","空きマス");
   grid.append(el);
  }
@@ -115,9 +118,9 @@ document.addEventListener("keydown",e=>{
  else if(e.key==="Delete"||e.key==="Backspace")tileCommand("dismantle");
  else if(/^[0-9]$/.test(e.key)&&playing)selectTool(order[e.key==="0"?9:Number(e.key)-1]);
 });
-function renderGrid(board,id){
+function renderGrid(board,id,deposits=[]){
  if(!Array.isArray(board))return;
- for(let i=0;i<64;i++){
+ for(let i=0;i<SIZE*SIZE;i++){
   const m=board[i],el=getCell(id,i),type=m?.type||"",rotation=m?.dir??0;
   if(el.dataset.type!==type||el.dataset.dir!==String(rotation)){
    el.dataset.type=type;el.dataset.dir=String(rotation);el.replaceChildren();
@@ -129,7 +132,8 @@ function renderGrid(board,id){
     const cargo=document.createElement("i");cargo.className="cargo-dot";el.append(cargo);
    }
   }
-  el.classList.toggle("occupied",!!m);el.classList.toggle("machine-online",!!m&&m.active);el.classList.toggle("machine-offline",!!m&&!m.active);
+  el.classList.toggle("occupied",!!m);el.classList.toggle("resource-node",deposits.includes(i));
+  el.classList.toggle("machine-online",!!m&&m.active);el.classList.toggle("machine-offline",!!m&&!m.active);
   if(m){
    const bar=el.querySelector(".health-indicator");
    if(bar)bar.style.setProperty("--hp",(Math.max(0,Math.min(100,m.hp/(defs[type]?.hp||400)*100)))+"%");
@@ -152,7 +156,20 @@ function showUpgrades(ids){
 }
 function updateUI(s){
  const me=s.players[meIndex],op=s.players[1-meIndex];
- renderGrid(me.board,"myGrid");renderGrid(op.board,"enemyGrid");
+ renderGrid(me.board,"myGrid",me.deposits||[]);renderGrid(op.board,"enemyGrid",op.deposits||[]);
+ $("battleLayout").classList.toggle("defense-mode",s.mode!=="pvp");
+ $("phaseBanner").classList.toggle("battle-phase",s.phase==="battle");
+ if(s.mode==="pvp"){
+   const building=s.phase==="build";
+   const remain=Math.ceil(Math.max(0,building?s.buildTime-s.elapsed:s.length-s.elapsed));
+   setText("phaseLabel",building?"⚙ 建設フェーズ：敵からの攻撃なし / 工場を完成させよう":"⚔ PVP戦闘フェーズ：建設不可 / 工場同士が交戦中");
+   setText("phaseClock",String(Math.floor(remain/60)).padStart(2,"0")+":"+String(remain%60).padStart(2,"0"));
+ }else{
+   setText("phaseLabel","⚠ 工場防衛：製造した弾薬で敵ウェーブを迎撃しよう");
+   setText("phaseClock","WAVE "+s.wave+" / "+s.maxWaves);
+   renderWave(s);
+ }
+ $("deleteBtn").disabled=$("rotateBtn").disabled=s.phase==="battle";
  setText("myName",me.name);setText("enemyName",op.name);
  setText("myHp",Math.ceil(me.coreHp)+" / "+me.maxCoreHp);setText("enemyHp",Math.ceil(op.coreHp)+" / "+op.maxCoreHp);
  $("myHpBar").style.width=(100*Math.max(0,me.coreHp/me.maxCoreHp))+"%";
@@ -166,7 +183,7 @@ function updateUI(s){
  const left=Math.ceil(Math.max(0,s.length-s.elapsed));
  setText("timer",String(Math.floor(left/60)).padStart(2,"0")+":"+String(left%60).padStart(2,"0"));
  $("timer").classList.toggle("critical",left<=30);$("timeProgress").style.width=(100*left/s.length)+"%";
- for(const b of $("toolGrid").children)b.style.opacity=me.scrap>=(defs[b.dataset.type]?.cost||0)?"1":".53";
+ for(const b of $("toolGrid").children)b.style.opacity=s.phase!=="battle"&&me.scrap>=(defs[b.dataset.type]?.cost||0)?"1":".45";
  $("targetCore").classList.toggle("active",me.focus==="core");
  $("targetProduction").classList.toggle("active",me.focus==="production");
  if(me.options?.length&&!s.ended){
@@ -176,15 +193,15 @@ function updateUI(s){
 }
 function attackSource(board,id){
  const list=board.map((m,i)=>({m,i})).filter(o=>o.m&&["turret","rocket"].includes(o.m.type));
- const i=list.length?list[Math.floor(Math.random()*list.length)].i:59;
+ const i=list.length?list[Math.floor(Math.random()*list.length)].i:CORE_IDX;
  return {tile:getCell(id,i),kind:board[i]?.type==="rocket"?"rocket":"bullet"};
 }
 function targetCell(oldP,newP,id){
- for(let i=0;i<64;i++){
+ for(let i=0;i<SIZE*SIZE;i++){
   const old=oldP.board[i],next=newP.board[i];
   if(old&&old.type!=="core"&&(!next||next.hp<old.hp))return getCell(id,i);
  }
- return getCell(id,59);
+ return getCell(id,CORE_IDX);
 }
 function animateDiff(old,s){
  for(let k=0;k<2;k++){
@@ -200,26 +217,59 @@ function animateDiff(old,s){
   const damage=after.stats.damage-before.stats.damage;
   if(damage>0){
    const source=attackSource(before.board,id);
-   const dest=targetCell(old.players[1-k],s.players[1-k],k===meIndex?"enemyGrid":"myGrid");
+   const dest=s.mode==="pvp"?targetCell(old.players[1-k],s.players[1-k],k===meIndex?"enemyGrid":"myGrid"):$("waveDisplay");
    if(source.tile&&dest){
     source.tile.classList.remove("shooting");void source.tile.offsetWidth;source.tile.classList.add("shooting");
     FX.shot(source.tile,dest,damage>=20?"rocket":source.kind,k===meIndex?"ally":"enemy",damage);
    }
   }
  }
+ if(s.mode!=="pvp" && s.threatHits>old.threatHits){
+   const delta=Math.min(12,s.threatHits-old.threatHits),target=getCell("myGrid",CORE_IDX);
+   for(let i=0;i<delta;i++)FX.shot($("waveDisplay"),target,"rocket","enemy",8);
+ }
+}
+function renderWave(s){
+ setText("waveCount","WAVE "+s.wave+" / "+s.maxWaves);
+ const left=s.wave===s.maxWaves?"最終ウェーブ":s.wave===0?"第1ウェーブ準備中":"次の襲撃へ備えよう";
+ setText("waveDesc",left+"。設備を効率よくつないで弾薬と電力を切らさないようにしよう。");
+ const enemyList=s.enemies||[],near=enemyList.length?Math.max(...enemyList.map(e=>e.progress)):0;
+ $("waveDanger").style.width=Math.min(100,Math.max(0,near*100))+"%";
+ const root=$("waveEnemies");root.replaceChildren();
+ for(const e of enemyList.slice(0,24)){
+   const cell=document.createElement("div");cell.className="wave-enemy"+(e.kind==="boss"?" boss":"");
+   const symbol=document.createElement("span");symbol.textContent=e.kind==="boss"?"♛":e.kind==="armored"?"◈":"✹";
+   const hp=document.createElement("i");hp.className="hp";hp.style.setProperty("--enemy-hp",Math.min(100,Math.max(0,e.hp/e.maxHp*100))+"%");
+   const progress=document.createElement("i");progress.className="enemy-progress";progress.style.setProperty("--progress",Math.max(0,Math.min(100,e.progress*100))+"%");
+   const label=document.createElement("small");label.textContent=Math.max(0,Math.round(e.hp))+" HP";
+   cell.append(symbol,hp,progress,label);root.append(cell);
+ }
+ setText("waveNext",enemyList.length?enemyList.length+" 機が接近中":s.wave===s.maxWaves?"すべて撃退するとクリア":"敵の襲撃に備えよう");
 }
 function finish(s){
  playing=false;document.body.classList.remove("playing");
  const me=s.players[meIndex],win=s.winner===me.id,draw=s.winner==="draw";
+ const rewards=window.RogueWorld?.onFinish(s,meIndex);
  $("resultOverlay").querySelector(".modal").classList.toggle("is-loss",!win);
  setText("resultSymbol",win?"✦":draw?"◇":"✕");setText("resultTitle",win?"VICTORY":draw?"DRAW":"DEFEAT");
- setText("resultDetail",win?"敵の工場を制圧しました！":draw?"互角の工業戦でした。":"工場が敗北しました。生産ラインを見直そう。");
+ setText("resultDetail",win?(s.mode==="pvp"?"敵工場を制圧しました！":"敵のウェーブをすべて撃退し工場を守り抜いた！"):draw?"両者互角の工業戦でした。":"工場の防衛に失敗しました。生産ラインを再設計しよう。");
  setText("resultDamage",Math.round(me.stats.damage));setText("resultOre",me.stats.ore);
+ const worldRewards=$("worldReward"),returnBtn=$("resultToMapBtn");
+ worldRewards.hidden=!rewards;returnBtn.hidden=!rewards;
+ if(rewards){
+   worldRewards.replaceChildren();
+   const lines=[rewards.won?"防衛成功："+rewards.stage+" / "+("★".repeat(rewards.stars)):"防衛失敗："+rewards.stage,
+     "獲得経験値 +"+rewards.xp+" XP / クレジット ◆"+rewards.credits];
+   if(rewards.blueprint)lines.push("新設計図："+rewards.blueprint);
+   if(rewards.daily)lines.push("デイリーボーナス：◆"+rewards.daily);
+   if(rewards.next?.length)lines.push("新しいエリア解放："+rewards.next.join("、"));
+   lines.forEach(line=>{const div=document.createElement("div");div.textContent=line;worldRewards.append(div);});
+ }
  overlay("resultOverlay");if(win)FX.victory();
 }
 function receive(s){
  if(!s?.players||s.players.length!==2)return;
- const old=state;state=s;updateUI(s);
+ const old=state;state=s;updateUI(s);window.RogueWorld?.tutorialUpdate(s,meIndex);
  if(old&&old.id===s.id)animateDiff(old,s);
  if(s.ended&&!old?.ended)finish(s);
 }

@@ -18,4 +18,8 @@ jobs:
           node --check game/engine.js
           node --check public/app.js
           node --check public/effects.js
+          node --check public/world-data.js
+          node --check public/world.js
+          node --check game/headquarters.js
+          node --check public/hq.js
       - run: npm test
