@@ -22,4 +22,7 @@ jobs:
           node --check public/world.js
           node --check game/headquarters.js
           node --check public/hq.js
+          node --check game/industrial-world.js
+          node --check public/industrial-shared.js
+          node --check public/industrial.js
       - run: npm test
