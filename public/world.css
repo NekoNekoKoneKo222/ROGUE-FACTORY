@@ -1,0 +1,189 @@
+/* ROGUE FACTORY · Interactive Campaign / World Atlas */
+.map-header-btn{border:1px solid #4ef2dc77;background:#123439;color:#75f9ea;font:700 11px 'Chakra Petch',sans-serif;letter-spacing:1.2px;padding:10px 13px;box-shadow:inset 0 0 18px #4ef2dc16}
+.map-header-btn:hover{border-color:#4ef2dc;background:#1a4b50}
+.world-primary{background:linear-gradient(110deg,#2dd1b8,#77f8d7);border-color:#96ffe6;box-shadow:0 0 22px #3de5e229}
+.world-overlay{padding:12px;background:rgba(4,13,20,.94);align-items:stretch;z-index:55}
+.world-shell{display:flex;flex-direction:column;min-height:0;min-width:0;width:min(1900px,100%);margin:auto;background:#0b1a26;border:1px solid #436475;box-shadow:0 20px 80px #000a;overflow:hidden}
+.world-top{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 26px;background:linear-gradient(115deg,#142c36,#0d1929);border-bottom:1px solid #2d5060;flex-shrink:0}
+.world-top h2{font:700 clamp(26px,3vw,42px) 'Chakra Petch',sans-serif;letter-spacing:5px;margin:5px 0}
+.world-top h2 em{font-style:normal;color:#4ef2dc}
+.world-top p{font-size:12px;color:#92b5c1;margin:0}
+.world-top-right{display:flex;align-items:center;gap:20px}
+.world-wallet{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.world-wallet span{color:#baf4ec;border:1px solid #335764;background:#102936;font:700 13px 'Chakra Petch',sans-serif;padding:10px 14px;white-space:nowrap}
+.world-wallet span:nth-child(2){color:#ffd17c}
+.world-wallet span:nth-child(3){color:#f5e29c}
+.world-close{width:42px;height:42px;flex:0 0 auto;background:#1c2a3a;border:1px solid #436070;color:#e8f9fa;font-size:18px}
+.world-close:hover{border-color:#ff6b80;color:#ff6b80}
+.world-tabs{display:flex;gap:0;border-bottom:1px solid #29495a;background:#0b2030;flex-shrink:0}
+.world-tabs button{background:none;color:#84a4b3;border:0;border-right:1px solid #263f4c;padding:13px 24px;font:700 12px 'Chakra Petch',sans-serif;letter-spacing:.8px}
+.world-tabs button.active{color:#69f4df;background:#17333e;box-shadow:inset 0 -3px 0 #4ef2dc}
+.world-tabs button:hover{color:white}
+.world-content{flex:1;min-height:300px}
+.world-map-view{display:grid;grid-template-columns:minmax(0,1fr) clamp(265px,25vw,365px);height:min(72vh,760px);min-height:390px}
+.world-map-view[hidden],.world-extra-view[hidden]{display:none!important}
+.world-map-scroll{position:relative;overflow:auto;overscroll-behavior:contain;background:#111f2d;scrollbar-color:#4f7883 #0b1a27;scrollbar-width:thin}
+.world-map-scene{width:3500px;height:1250px;position:relative;isolation:isolate;background:linear-gradient(155deg,transparent,#00000030),radial-gradient(ellipse 37% 75% at 10% 62%,#76533c 0%,#4c3c30 50%,transparent 70%),radial-gradient(ellipse 27% 70% at 35% 28%,#246e60 0%,#183f42 70%,transparent 85%),radial-gradient(ellipse 25% 68% at 55% 42%,#3c3b75 0%,#24314f 72%,transparent 85%),radial-gradient(ellipse 24% 80% at 75% 50%,#496d81 0%,#2e4967 70%,transparent 85%),radial-gradient(ellipse 25% 80% at 94% 47%,#683763 0%,#2c294a 70%,transparent 85%),#152837}
+.world-map-scene::before{position:absolute;inset:0;content:"";z-index:0;opacity:.35;background-image:linear-gradient(#78a5b615 1px,transparent 1px),linear-gradient(90deg,#78a5b615 1px,transparent 1px);background-size:60px 60px}
+.world-map-scene::after{position:absolute;inset:12px;border:2px solid #9accc522;content:"";z-index:0;pointer-events:none}
+.world-area{position:absolute;border-radius:48%;opacity:.22;pointer-events:none;filter:blur(9px)}
+.area-rust{width:890px;height:900px;left:-130px;top:280px;background:repeating-radial-gradient(ellipse,#d19a54 0,#9e6c3c 18px,#5b4631 47px,#7f5a39 63px)}
+.area-steam{width:960px;height:950px;left:650px;top:-140px;background:repeating-radial-gradient(ellipse,#78bca0 0,#2a817e 35px,#1e5c62 65px)}
+.area-storm{width:900px;height:920px;left:1300px;top:-20px;background:repeating-radial-gradient(ellipse,#8d7dc8 0,#464c8e 35px,#30375f 70px)}
+.world-river{position:absolute;z-index:0;pointer-events:none;border-radius:50%;border:80px solid #69c5d435;filter:blur(12px)}
+.river-a{width:1300px;height:500px;left:560px;top:670px;transform:rotate(-21deg)}
+.river-b{width:970px;height:530px;left:1920px;top:650px;transform:rotate(35deg)}
+.world-road-layer{position:absolute;top:0;left:0;width:3500px;height:1250px;z-index:1;pointer-events:none;overflow:visible}
+.world-road{fill:none;stroke:#b6af88;stroke-width:5;stroke-dasharray:8 12;opacity:.42;filter:drop-shadow(0 2px 3px #0005)}
+.world-road.available{stroke:#8be8dc;opacity:.75;stroke-dasharray:9 9}
+.world-road.complete{stroke:#f7d18b;opacity:.9;stroke-dasharray:none;stroke-width:6}
+.world-region-name{position:absolute;z-index:2;text-shadow:1px 3px 7px #07111ad0;pointer-events:none;display:flex;flex-direction:column;gap:5px;color:var(--region-color,#e0e4ea)}
+.world-region-name span{font:700 12px 'Noto Sans JP',sans-serif;color:#d4e1df}
+.world-region-name b{font:800 30px 'Noto Sans JP',sans-serif;letter-spacing:2px}
+.world-region-name small{font:700 14px 'Chakra Petch',sans-serif;letter-spacing:3px;opacity:.85}
+.world-landmark{position:absolute;pointer-events:none;z-index:1;color:#dfd4bb;font:700 44px 'Chakra Petch',sans-serif;opacity:.36;text-shadow:0 7px 12px #000a;transform:rotate(-14deg)}
+.world-node{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;flex-direction:column;gap:2px;width:120px;padding:0;background:none;border:0;color:#ebf9f9;z-index:3;text-shadow:0 2px 4px #000}
+.world-node .node-inner{width:67px;height:67px;border:3px solid #78eddf;background:radial-gradient(circle,#205c63 0%,#102f3c 68%);display:grid;place-items:center;border-radius:50%;font:700 32px 'Chakra Petch',sans-serif;box-shadow:0 0 0 6px #0005,0 0 22px #43e8d64a;transition:transform .2s,box-shadow .2s;position:relative}
+.world-node.is-locked .node-inner{border-color:#4e6471;color:#95a1ae;background:#26313f;box-shadow:0 0 0 5px #0006}
+.world-node.is-cleared .node-inner{border-color:#f4cc76;color:#ffe3a2;box-shadow:0 0 0 5px #0006,0 0 30px #ffd37b66}
+.world-node.boss .node-inner{width:78px;height:78px;border-color:#ff8c9f;color:#ffd4db;background:#603b51;box-shadow:0 0 0 6px #0007,0 0 35px #ff637c7d}
+.world-node.challenge .node-inner{border-style:dashed}
+.world-node:hover .node-inner,.world-node.is-selected .node-inner{transform:scale(1.16);box-shadow:0 0 0 5px #0008,0 0 38px #b2fff291}
+.world-node .node-number{position:absolute;top:2px;right:23px;color:#e9fffa;background:#244755;border:1px solid #679e9c;font:700 10px 'Chakra Petch',sans-serif;padding:3px 5px;z-index:5}
+.world-node .node-name{font:700 12px 'Noto Sans JP',sans-serif;white-space:nowrap;padding:4px 8px;background:#101d2de6;border:1px solid #5b7b81;max-width:190px;min-width:105px}
+.world-node .node-stars{font-size:14px;letter-spacing:2px;color:#ffdb85;min-height:20px}
+.world-compass{position:absolute;top:35px;left:35px;color:#f0e8d1;font:700 14px 'Chakra Petch',sans-serif;display:flex;flex-direction:column;align-items:center;text-shadow:0 0 8px #fff7;pointer-events:none;z-index:1}
+.world-compass span{font-size:31px}
+.world-detail{background:linear-gradient(155deg,#122e3c,#0a1825);border-left:1px solid #426171;padding:21px;overflow-y:auto;scrollbar-width:thin;min-width:0}
+.world-detail-type{display:block;color:#6addd5;font:700 11px 'Chakra Petch',sans-serif;letter-spacing:2px;margin-bottom:12px}
+.world-detail h3{font:800 22px/1.4 'Noto Sans JP',sans-serif;margin:0;color:#eafffa}
+.world-detail>p:nth-of-type(1){font:700 11px 'Chakra Petch',sans-serif;letter-spacing:2px;color:#82aaba;margin-top:5px}
+.world-detail-stars{font:700 27px 'Chakra Petch',sans-serif;color:#f5d177;letter-spacing:6px;margin:18px 0 10px}
+.world-story{font:500 12px/1.8 'Noto Sans JP',sans-serif;color:#a7bfcc}
+.world-detail-data{display:grid;gap:11px;border-top:1px solid #294b59;border-bottom:1px solid #294b59;padding:15px 0;margin:16px 0}
+.world-detail-data>div{display:flex;justify-content:space-between;align-items:start;gap:10px}
+.world-detail-data span{font-size:11px;color:#7e9fae;flex:0 0 100px}
+.world-detail-data strong{font-size:11px;color:#dfefec;text-align:right;max-width:58%;overflow-wrap:anywhere}
+.world-sortie{width:100%;border:1px solid #9dffe5;background:#48ddbf;color:#04242a;font:800 15px 'Noto Sans JP',sans-serif;padding:15px 10px}
+.world-sortie:hover:not(:disabled){filter:brightness(1.13);box-shadow:0 0 16px #48ddbf66}
+.world-sortie:disabled{background:#334654;border-color:#526873;color:#8ba2a7}
+.world-unlock-hint{font-size:11px;color:#abc5c7;margin:9px 0;text-align:center}
+.world-quest{background:#102835;border:1px solid #2d5860;margin-top:20px;padding:13px}
+.world-quest-title{font:700 11px 'Chakra Petch',sans-serif;letter-spacing:1.4px;color:#6bd3d0}
+#worldQuestText{font-size:11px;line-height:1.7;color:#adbbc7;margin:9px 0}
+.world-quest-progress{height:5px;background:#2b4757}
+.world-quest-progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,#15998e,#7fffe2);transition:width .2s}
+.world-bottom{border-top:1px solid #335263;display:flex;justify-content:space-between;gap:10px;align-items:center;background:#0b1d2d;padding:12px 20px;font:500 11px 'Noto Sans JP',sans-serif;color:#8fa9b8}
+.world-extra-view{padding:28px;overflow:auto;max-height:72vh;min-height:380px;background:linear-gradient(130deg,#102a37,#101d2a)}
+.world-extras-title h3{font-size:25px;margin:0 0 20px}
+.world-mastery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.world-mastery-card{display:grid;grid-template-columns:45px 1fr auto;gap:8px;padding:14px;background:#17313d;border:1px solid #3a626b;align-items:center}
+.mastery-icon{font:700 31px 'Chakra Petch',sans-serif;color:#67ecda}
+.world-mastery-card b{display:block;font-size:14px}
+.world-mastery-card small{display:block;font:700 10px 'Chakra Petch',sans-serif;color:#89a5b1}
+.mastery-level{font:700 16px 'Chakra Petch',sans-serif;color:#f8d384}
+.mastery-track{grid-column:1 / -1;height:5px;background:#284d5a}
+.mastery-track i{display:block;height:100%;background:#6be8d1}
+.mastery-xp{grid-column:1 / -1;text-align:right;color:#8ca8b8;font:700 11px 'Chakra Petch',sans-serif}
+.world-record-columns{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.world-record-panel{min-width:0;border:1px solid #355c67;background:#102632;padding:17px}
+.world-record-panel h4{margin:0 0 12px;font-size:18px}
+.world-achievement,.world-collection-item{display:flex;align-items:center;gap:12px;padding:10px 3px;border-bottom:1px solid #294757;opacity:.65}
+.world-achievement.completed,.world-collection-item.collected{opacity:1}
+.world-achievement .ach-icon,.world-collection-item>span{font-size:25px;color:#6be8d1}
+.world-achievement>div,.world-collection-item>div{flex:1}
+.world-achievement b,.world-collection-item b{font-size:12px}
+.world-achievement small,.world-collection-item small{font-size:10px;color:#8daebb;display:block;margin-top:3px}
+.world-achievement strong{font:700 10px 'Chakra Petch',sans-serif;color:#f5d07b}
+.world-extra-note{font-size:12px;color:#9bb5c0;line-height:1.8;margin-top:20px}
+.tutorial-guide{position:fixed;bottom:18px;left:18px;z-index:40;max-width:min(390px,calc(100vw - 36px));border:2px solid #70ead9;background:linear-gradient(135deg,#113a45,#0b1b2b);box-shadow:0 0 45px #0c8b8760,0 15px 35px #000a;padding:14px}
+.tutorial-guide[hidden],.tutorial-show[hidden],.world-result-rewards[hidden],.world-result-return[hidden]{display:none!important}
+.tutorial-guide-top{display:flex;justify-content:space-between;align-items:center;color:#62e9d6;font:700 11px 'Chakra Petch',sans-serif;letter-spacing:1.4px}
+.tutorial-guide-top button{border:0;background:#275160;color:#fff;font:700 19px 'Chakra Petch',sans-serif;padding:1px 9px}
+.tutorial-guide-title{font:800 19px 'Noto Sans JP',sans-serif;margin:10px 0;color:#f4ffff}
+.tutorial-guide-text{font-size:12px;line-height:1.7;color:#cee5e9}
+.tutorial-guide-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid #39616a;margin-top:10px;padding-top:10px;font-size:10px;color:#d6b77c}
+.tutorial-dots{display:flex;gap:5px}
+.tutorial-dots i{width:8px;height:8px;background:#456475;border:1px solid #6c8d98;border-radius:50%}
+.tutorial-dots i.current{background:#79ead2;box-shadow:0 0 10px #79ead2}
+.tutorial-dots i.completed{background:#ffdd8d}
+.tutorial-show{position:fixed;bottom:14px;left:14px;z-index:41;padding:9px 17px;border:1px solid #62e9d6;background:#193e4b;color:#d6fffa}
+.tile.tutorial-target{outline:3px solid #ffe08a!important;outline-offset:-3px;box-shadow:inset 0 0 20px #ffde4566,0 0 16px #ffec55aa;animation:tutorial-target-pulse 1.2s ease-in-out infinite;z-index:6}
+@keyframes tutorial-target-pulse{50%{box-shadow:inset 0 0 22px #ffde4588,0 0 25px #fff2a9cc}}
+.world-result-rewards{display:grid;gap:6px;border:1px solid #42646c;background:#102d39;margin-bottom:14px;padding:14px;color:#f5d588;font:700 12px 'Noto Sans JP',sans-serif}
+.world-result-return{display:block;margin:0 0 10px;justify-content:center;text-align:center}
+.wave-display{display:none;position:relative;border:1px solid #345b69;background:linear-gradient(175deg,#102839,#141d32);padding:18px;min-height:350px}
+.battle-layout.defense-mode .enemy .factory-grid-wrap{display:none}
+.battle-layout.defense-mode .enemy .wave-display{display:flex;flex-direction:column;gap:14px}
+.wave-display h4{font:700 18px 'Chakra Petch',sans-serif;margin:0;color:#ffd9a1;letter-spacing:1.5px}
+.wave-headline{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wave-headline small{color:#89b5c1}
+.wave-counter{font:700 22px 'Chakra Petch',sans-serif;color:#ffa8a9}
+.wave-description{font-size:12px;color:#a8c4ce;line-height:1.7}
+.wave-progress-track{height:8px;background:#254053;position:relative;overflow:hidden}
+.wave-progress-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffc17a,#ff5775);transition:width .3s}
+.wave-enemies{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;align-content:start;min-height:135px}
+.wave-enemy{height:64px;border:1px solid #67525d;background:#382b36;position:relative;display:grid;place-items:center;font-size:26px;box-shadow:inset 0 0 13px #a734541b}
+.wave-enemy.boss{background:#603345;border-color:#ff7a98;font-size:34px}
+.wave-enemy small{position:absolute;bottom:2px;color:#ffe4e9;font:700 9px 'Chakra Petch',sans-serif}
+.wave-enemy .hp{position:absolute;left:0;bottom:0;height:3px;background:#ff6376;width:var(--enemy-hp,100%)}
+.wave-enemy .enemy-progress{position:absolute;top:0;left:0;height:2px;background:#f4c56b;width:var(--progress,0%)}
+.wave-next{font:700 12px 'Chakra Petch',sans-serif;color:#ffd48c}
+.phase-banner{margin:0 0 12px;padding:12px 16px;border:1px solid #4e6b72;background:linear-gradient(90deg,#133440,#162332);display:flex;justify-content:space-between;align-items:center;gap:10px;font:700 14px 'Noto Sans JP',sans-serif}
+.phase-banner strong{font:700 20px 'Chakra Petch',sans-serif;color:#f5d991}
+.phase-banner.battle-phase{border-color:#c65765;background:#3a1e2b;box-shadow:0 0 20px #ff506526}
+.phase-banner.battle-phase strong{color:#ff8490}
+.factory-grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+.tile.resource-node:not(.occupied){background:radial-gradient(circle,#ae884e77 0 20%,#163a42 50%,#102735 85%);border-color:#a07e4b77}
+.tile.resource-node:not(.occupied)::after{content:"◆";position:absolute;color:#d7a15d;font:700 12px 'Chakra Petch',sans-serif;opacity:.72}
+.battle-layout.defense-mode{grid-template-columns:minmax(0,1.2fr) minmax(0,.75fr);gap:18px}
+.battle-layout.defense-mode .combat-divider{display:none}
+.battle-layout.defense-mode .factory-panel.enemy{border-color:#5a4954}
+.battle-layout.defense-mode .factory-panel.enemy .factory-header h3{color:#f3b9a5}
+.battle-layout.defense-mode .enemy .factory-footer{display:none}
+.battle-layout.defense-mode .factory-grid{max-width:660px;margin:auto}
+@media(max-width:1050px){
+ .world-map-view{grid-template-columns:minmax(0,1fr) 280px}
+ .world-top{padding:14px}
+ .world-top-right{gap:9px}
+ .world-wallet span{font-size:11px;padding:8px}
+ .battle-layout.defense-mode{grid-template-columns:minmax(0,1fr) 300px}
+}
+@media(max-width:720px){
+ .world-overlay{padding:0}
+ .world-shell{border:0;height:100vh;height:100dvh}
+ .world-top{padding:10px 12px}
+ .world-top h2{font-size:25px;letter-spacing:2px}
+ .world-top p{display:none}
+ .world-wallet{gap:3px}
+ .world-wallet span{font-size:10px;padding:5px}
+ .world-close{width:34px;height:34px}
+ .world-tabs button{padding:9px 8px;font-size:10px;flex:1}
+ .world-map-view{display:flex;flex-direction:column;height:auto;min-height:0}
+ .world-map-scroll{height:53%;flex:1;min-height:220px}
+ .world-detail{height:47%;min-height:260px;padding:12px 14px;border-left:0;border-top:1px solid #426171}
+ .world-detail h3{font-size:19px}
+ .world-detail-stars{font-size:20px;margin:8px 0}
+ .world-detail-data{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:9px 0;margin:10px 0}
+ .world-detail-data>div{display:block}
+ .world-detail-data span{display:block}
+ .world-detail-data strong{display:block;max-width:100%;text-align:left}
+ .world-story{margin:6px 0}
+ .world-quest{display:none}
+ .world-bottom{padding:7px;font-size:9px}
+ .world-bottom span:last-child{display:none}
+ .world-extra-view{padding:12px;min-height:0;max-height:none}
+ .world-record-columns{grid-template-columns:1fr}
+ .world-mastery-grid{grid-template-columns:1fr}
+ .battle-layout.defense-mode{display:flex;flex-direction:column;gap:12px}
+ .battle-layout.defense-mode .enemy .wave-display{min-height:180px}
+ .wave-enemies{grid-template-columns:repeat(8,1fr);min-height:50px}
+ .wave-enemy{height:43px;font-size:20px}
+ .wave-display{padding:12px}
+ .phase-banner{font-size:12px;padding:9px}
+ .phase-banner strong{font-size:15px}
+ .tutorial-guide{bottom:7px;left:7px;max-width:min(330px,calc(100vw - 14px));padding:9px}
+ .tutorial-guide-title{font-size:14px;margin:5px 0}
+ .tutorial-guide-text{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){.tile.tutorial-target{animation:none!important}}
