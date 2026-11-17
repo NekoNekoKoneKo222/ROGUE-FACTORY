@@ -42,7 +42,8 @@ function makePlayer(id, name, bot=false) {
   return {
     id, name, bot, board, scrap:36, coreHp:400, maxCoreHp:400,
     upgrades:[], options:[], optionTime:0, focus:"core", powerUsed:0, powerTotal:0,
-    stats:{ore:0,metal:0,ammo:0,damage:0}, aiStep:0
+    stats:{ore:0,metal:0,ammo:0,damage:0}, aiStep:0,
+    damageFactor:1, incomeFactor:1, disableBotBuild:false
   };
 }
 function offer(player, time) {
@@ -52,11 +53,34 @@ function offer(player, time) {
   player.options=choices.map(u=>u.id);
   player.optionTime=time;
 }
-function newGame(a,b) {
-  const game={id:randomId(), elapsed:0, ended:false, winner:null, finishReason:null, event:null, players:[
-    makePlayer(a.id,a.name,!!a.bot), makePlayer(b.id,b.name,!!b.bot)
-  ]};
-  game.players.forEach(p=>offer(p,0));
+function newGame(a,b,options={}) {
+  const stage=options.stage||null;
+  const game={id:randomId(), elapsed:0, ended:false, winner:null, finishReason:null, event:null,
+    mode:stage?"world":(b.bot?"solo":"pvp"),stageId:stage?.id||null,
+    stageName:stage?.name||null,stageRule:stage?.rule||null,
+    length:Number.isFinite(stage?.duration)?Math.max(60,stage.duration):LENGTH,
+    players:[makePlayer(a.id,a.name,!!a.bot),makePlayer(b.id,b.name,!!b.bot)]
+  };
+  if(stage){
+    const [human,enemy]=game.players;
+    human.scrap=stage.playerScrap??36;
+    enemy.scrap=stage.enemyScrap??36;
+    enemy.incomeFactor=stage.enemyIncome??1;
+    enemy.damageFactor=stage.enemyDamage??1;
+    enemy.coreHp=stage.coreHp??400;
+    enemy.maxCoreHp=enemy.coreHp;
+    enemy.board[idx(3,7)].hp=enemy.coreHp;
+    if(stage.id==="tutorial"){
+      // Beginner exercise: construct the missing conveyor / furnace / ammo line.
+      for(const [x,y] of [[2,1],[3,1],[4,1],[5,1],[6,1]])human.board[idx(x,y)]=null;
+      for(const enemyMachine of enemy.board){
+        if(enemyMachine && enemyMachine.type!=="core" && enemyMachine.type!=="generator")enemyMachine.hp=0;
+      }
+      enemy.board=enemy.board.map(m=>m?.hp<=0?null:m);
+      enemy.disableBotBuild=true;
+    }
+  }
+  if(game.stageId!=="tutorial")game.players.forEach(p=>offer(p,0));
   return game;
 }
 function costFor(player,type) {
@@ -137,7 +161,7 @@ function activeInterval(p,type,base) {
 function damage(game,who,base,mode) {
   const attacker=game.players[who], defender=game.players[1-who];
   const shields=defender.board.filter(m=>m&&m.type==="shield"&&m.active).length;
-  let points=base*(attacker.upgrades.includes("fire")?1.3:1);
+  let points=base*(attacker.upgrades.includes("fire")?1.3:1)*(attacker.damageFactor??1);
   if(attacker.upgrades.includes("crit") && Math.random()<0.15)points*=2;
   points*=Math.max(0.5,1-shields*0.18);
   const targets=defender.board.map((m,i)=>({m,i})).filter(v=>v.m && v.m.type!=="core");
@@ -157,7 +181,7 @@ function damage(game,who,base,mode) {
 }
 function processPlayer(game,who,dt) {
   const p=game.players[who];
-  p.scrap=Math.min(250,p.scrap+dt*(1.6+(p.upgrades.includes("scrap")?0.3:0)));
+  p.scrap=Math.min(250,p.scrap+dt*(1.6*(p.incomeFactor??1)+(p.upgrades.includes("scrap")?0.3:0)));
   powered(p);
   // A machine holds a small input buffer and one output item. Only a direct
   // neighbor or a conveyor can receive it; there is no global teleporting.
@@ -204,7 +228,7 @@ function processPlayer(game,who,dt) {
   }
 }
 function botAction(game,dt) {
-  const p=game.players[1];if(!p.bot || game.ended)return;
+  const p=game.players[1];if(!p.bot || game.ended || p.disableBotBuild)return;
   if(p.options.length)choose(game,1,p.options[Math.floor(Math.random()*p.options.length)]);
   // Build an additional complete production chain, then reinforce its defense.
   const plan=[[0,4,"generator"],[1,3,"drill"],[2,3,"belt"],[3,3,"furnace"],[4,3,"belt"],[5,3,"ammo"],[6,3,"turret"],[0,5,"generator"],[6,5,"wall"],[4,5,"shield"]];
@@ -218,30 +242,34 @@ function step(game,dt=0.25) {
   if(game.ended)return game;
   dt=Math.max(0,Math.min(0.5,dt));
   const before=game.elapsed;
-  game.elapsed=Math.min(LENGTH,game.elapsed+dt);
+  game.elapsed=Math.min(game.length,game.elapsed+dt);
   for(const p of game.players) {
     if(p.options.length && game.elapsed-p.optionTime>=9) choose(game,game.players.indexOf(p),p.options[0]);
   }
-  for(const marker of [30,60,90,120,150]){
-    if(before<marker && game.elapsed>=marker)game.players.forEach(p=>offer(p,game.elapsed));
+  if(game.stageId!=="tutorial"){
+    for(let marker=30;marker<game.length;marker+=30){
+      if(before<marker && game.elapsed>=marker)game.players.forEach(p=>offer(p,game.elapsed));
+    }
   }
-  if(before<90 && game.elapsed>=90)game.event="鉱石フィーバー！ 残り90秒";
-  if(before<150 && game.elapsed>=150)game.event="最終決戦！ 残り30秒";
+  if(game.stageId!=="tutorial" && before<90 && game.elapsed>=90)game.event="鉱石フィーバー！";
+  if(before<game.length-30 && game.elapsed>=game.length-30)game.event="最終決戦！ 残り30秒";
   botAction(game,dt);
   // Alternating first processing player reduces first-mover advantages.
   if(Math.floor(game.elapsed/dt)%2){processPlayer(game,0,dt);processPlayer(game,1,dt);}
   else{processPlayer(game,1,dt);processPlayer(game,0,dt);}
-  if(game.players.some(p=>p.coreHp<=0) || game.elapsed>=LENGTH){
+  if(game.players.some(p=>p.coreHp<=0) || game.elapsed>=game.length){
     game.ended=true;
     const [a,b]=game.players;
     const r=a.coreHp/a.maxCoreHp-b.coreHp/b.maxCoreHp;
     game.winner=Math.abs(r)<0.00001?"draw":r>0?a.id:b.id;
-    game.finishReason=game.elapsed>=LENGTH?"time":"core";
+    game.finishReason=game.elapsed>=game.length?"time":"core";
   }
   return game;
 }
 function snapshot(game) {
-  return {id:game.id,elapsed:Math.round(game.elapsed*10)/10,length:LENGTH,ended:game.ended,winner:game.winner,
+  return {id:game.id,elapsed:Math.round(game.elapsed*10)/10,length:game.length,
+    mode:game.mode,stageId:game.stageId,stageName:game.stageName,stageRule:game.stageRule,
+    ended:game.ended,winner:game.winner,
     finishReason:game.finishReason,event:game.event,
     players:game.players.map(p=>({
       id:p.id,name:p.name,bot:p.bot,board:p.board.map(m=>m && ({
