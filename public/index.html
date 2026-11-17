@@ -51,6 +51,7 @@
       <div class="round-progress"><div id="timeProgress"></div></div>
     </section>
 
+    <section class="phase-banner" id="phaseBanner" aria-live="polite"><span id="phaseLabel">⚙ 工場稼働準備中</span><strong id="phaseClock">03:00</strong></section>
     <section class="battle-layout" id="battleLayout">
       <article class="factory-panel ally">
         <header class="factory-header">
@@ -85,6 +86,14 @@
           <div class="grid-corner tl"></div><div class="grid-corner tr"></div><div class="grid-corner bl"></div><div class="grid-corner br"></div>
           <div id="enemyGrid" class="factory-grid" role="grid" aria-label="敵の工場"></div>
           <span class="grid-label">TARGET ACQUIRED / 8×8</span>
+        </div>
+        <div class="wave-display" id="waveDisplay">
+          <div class="wave-headline"><h4>HOSTILE SWARM RADAR</h4><small>⚠ 工場防衛</small></div>
+          <div class="wave-counter" id="waveCount">WAVE 0 / 4</div>
+          <div class="wave-description" id="waveDesc">鉱石を採掘し、弾薬を生産して敵の襲撃に備えてください。</div>
+          <div class="wave-progress-track"><i id="waveDanger"></i></div>
+          <div class="wave-enemies" id="waveEnemies"></div>
+          <div class="wave-next" id="waveNext">NEXT WAVE: 準備中</div>
         </div>
         <footer class="factory-footer">
           <div><span>POWER NETWORK</span><strong id="enemyPower">0 / 12</strong></div>
@@ -139,7 +148,7 @@
       <label class="name-label" for="playerName">OPERATOR NAME</label>
       <input id="playerName" maxlength="20" placeholder="ENGINEER" value="ENGINEER" autocomplete="nickname">
       <div class="play-buttons">
-        <button id="worldBtn" class="play-primary world-primary" type="button">◈ ワールドマップへ <span>CAMPAIGN / 15 STAGES</span></button>
+        <button id="worldBtn" class="play-primary world-primary" type="button">◈ ワールドマップへ <span>CAMPAIGN / 24 STAGES</span></button>
         <button id="tutorialBtn" class="play-secondary" type="button">◎ チュートリアル <span>FACTORY BASICS</span></button>
         <button id="soloBtn" class="play-secondary" type="button">◉ フリーバトル <span>SOLO / TRAINING</span></button>
         <button id="pvpBtn" class="play-secondary" type="button">⚔ オンライン対戦 <span>1 VS 1 MATCHMAKING</span></button>
@@ -176,7 +185,7 @@
           <div class="world-map-scene" id="worldMapScene">
             <div class="world-area area-rust"></div><div class="world-area area-steam"></div><div class="world-area area-storm"></div>
             <div class="world-river river-a"></div><div class="world-river river-b"></div>
-            <svg class="world-road-layer" id="worldRoads" viewBox="0 0 1120 640" aria-hidden="true"></svg>
+            <svg class="world-road-layer" id="worldRoads" viewBox="0 0 3500 1250" aria-hidden="true"></svg>
             <div id="worldLandmarks"></div>
             <div id="worldNodes"></div>
             <div class="world-compass">N <span>✦</span> S</div>
@@ -244,7 +253,7 @@
       <span class="modal-kicker">// MATCH COMPLETE</span>
       <div id="resultSymbol" class="result-symbol">✦</div>
       <h2 id="resultTitle">VICTORY</h2>
-      <p id="resultDetail">敵コアを破壊しました。</p>
+      <p id="resultDetail">防衛成功！工場を守り切りました。</p>
       <div class="result-stats"><div>OUTPUT DAMAGE<strong id="resultDamage">0</strong></div><div>ORE EXTRACTED<strong id="resultOre">0</strong></div></div>
       <div id="worldReward" class="world-result-rewards" hidden></div>
       <button id="resultToMapBtn" class="play-secondary world-result-return" type="button" hidden>◈ ワールドマップへ戻る</button>
