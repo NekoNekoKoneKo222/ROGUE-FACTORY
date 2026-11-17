@@ -7,7 +7,10 @@
   <meta name="description" content="ROGUE FACTORY — 工場を構築して敵を撃破するオンライン工業ローグライクPvP。">
   <title>ROGUE FACTORY — INDUSTRIAL WARFARE</title>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/world.css">
+  <script defer src="/world-data.js"></script>
   <script defer src="/effects.js"></script>
+  <script defer src="/world.js"></script>
   <script defer src="/app.js"></script>
 </head>
 <body>
@@ -25,6 +28,7 @@
       </div>
     </div>
     <div class="top-actions">
+      <button class="map-header-btn" id="mapOpenBtn" type="button">◈ WORLD MAP</button>
       <div class="server"><i id="connectionLight"></i><span id="connectionLabel">STANDBY</span></div>
       <button id="audioToggle" class="icon-btn" type="button" title="効果音をON/OFF" aria-label="効果音を切り替え">♪ <span>OFF</span></button>
       <label class="quality-select">演出
@@ -135,12 +139,85 @@
       <label class="name-label" for="playerName">OPERATOR NAME</label>
       <input id="playerName" maxlength="20" placeholder="ENGINEER" value="ENGINEER" autocomplete="nickname">
       <div class="play-buttons">
-        <button id="soloBtn" class="play-primary" type="button">◉ CPUと対戦 <span>SOLO / TRAINING</span></button>
+        <button id="worldBtn" class="play-primary world-primary" type="button">◈ ワールドマップへ <span>CAMPAIGN / 15 STAGES</span></button>
+        <button id="tutorialBtn" class="play-secondary" type="button">◎ チュートリアル <span>FACTORY BASICS</span></button>
+        <button id="soloBtn" class="play-secondary" type="button">◉ フリーバトル <span>SOLO / TRAINING</span></button>
         <button id="pvpBtn" class="play-secondary" type="button">⚔ オンライン対戦 <span>1 VS 1 MATCHMAKING</span></button>
       </div>
       <p class="welcome-note">PC: クリックで設置 / 右クリックで設備回転　・　タッチ操作対応</p>
     </div>
   </div>
+
+
+  <div class="overlay world-overlay" id="worldOverlay" role="dialog" aria-modal="true" aria-labelledby="worldTitle">
+    <div class="world-shell">
+      <header class="world-top">
+        <div>
+          <span class="modal-kicker">// CAMPAIGN NAVIGATION</span>
+          <h2 id="worldTitle">WORLD <em>MAP</em></h2>
+          <p>工業世界を探索し、各地の自律工場を制圧しよう</p>
+        </div>
+        <div class="world-top-right">
+          <div class="world-wallet">
+            <span id="worldLevel">LV.1</span>
+            <span id="worldCredits">◆ 0</span>
+            <span id="worldStars">★ 0 / 45</span>
+          </div>
+          <button class="world-close" id="worldCloseBtn" type="button" title="ホームに戻る">✕</button>
+        </div>
+      </header>
+      <nav class="world-tabs" aria-label="ワールドメニュー">
+        <button type="button" class="active" data-world-tab="map">◈ ワールドマップ</button>
+        <button type="button" data-world-tab="mastery">⚙ 設備マスタリー</button>
+        <button type="button" data-world-tab="records">✦ 実績・設計図</button>
+      </nav>
+      <div id="worldMapView" class="world-content world-map-view">
+        <div class="world-map-scroll" id="worldMapScroll" tabindex="0" aria-label="スクロール可能なワールドマップ">
+          <div class="world-map-scene" id="worldMapScene">
+            <div class="world-area area-rust"></div><div class="world-area area-steam"></div><div class="world-area area-storm"></div>
+            <div class="world-river river-a"></div><div class="world-river river-b"></div>
+            <svg class="world-road-layer" id="worldRoads" viewBox="0 0 1120 640" aria-hidden="true"></svg>
+            <div id="worldLandmarks"></div>
+            <div id="worldNodes"></div>
+            <div class="world-compass">N <span>✦</span> S</div>
+          </div>
+        </div>
+        <aside class="world-detail" id="worldDetail">
+          <span class="world-detail-type" id="worldStageType">STAGE SELECT</span>
+          <h3 id="worldStageTitle">はじめての工場</h3>
+          <p id="worldStageSubtitle">ENGINEER TRAINING</p>
+          <div class="world-detail-stars" id="worldStageStars">☆☆☆</div>
+          <p class="world-story" id="worldStageStory">ワールドを探索して工場を強くしよう。</p>
+          <div class="world-detail-data">
+            <div><span>難易度</span><strong id="worldStageDifficulty">★</strong></div>
+            <div><span>特別ルール</span><strong id="worldStageRule">チュートリアル</strong></div>
+            <div><span>報酬XP / クレジット</span><strong id="worldStageReward">+100XP / ◆90</strong></div>
+            <div><span>収集できる設計図</span><strong id="worldStageBlueprint">新人エンジニアの腕章</strong></div>
+          </div>
+          <button id="worldStartBtn" type="button" class="world-sortie">▶ 出撃する</button>
+          <p class="world-unlock-hint" id="worldUnlockHint">開放済み</p>
+          <div class="world-quest">
+            <div class="world-quest-title">WORLD OBJECTIVES</div>
+            <div id="worldQuestText">ステージをクリアして新しい地域を開放</div>
+            <div class="world-quest-progress"><i id="worldQuestProgress"></i></div>
+          </div>
+        </aside>
+      </div>
+      <div id="worldExtraView" class="world-content world-extra-view" hidden></div>
+      <footer class="world-bottom">
+        <span>◈ 地図を横スクロールして各地域へ移動 / 開放条件はステージを選択</span>
+        <span>進行状況はこのブラウザに保存されます</span>
+      </footer>
+    </div>
+  </div>
+
+  <div class="tutorial-guide" id="tutorialGuide" hidden aria-live="polite">
+    <div class="tutorial-guide-top"><span>◎ FACTORY ACADEMY</span><button type="button" id="tutorialHideBtn" title="ガイドを隠す">−</button></div>
+    <div class="tutorial-guide-title" id="tutorialTitle">STEP 01 / 輸送</div>
+    <div class="tutorial-guide-text" id="tutorialText">コンベアを設置しよう。</div>
+    <div class="tutorial-guide-bottom"><span id="tutorialHint">下の設備を選択</span><div id="tutorialDots" class="tutorial-dots"></div></div>
+  </div>
+  <button type="button" id="tutorialShowBtn" class="tutorial-show" hidden>◎ ガイドを表示</button>
 
   <div class="overlay" id="queueOverlay">
     <div class="modal queue-modal">
@@ -169,6 +246,8 @@
       <h2 id="resultTitle">VICTORY</h2>
       <p id="resultDetail">敵コアを破壊しました。</p>
       <div class="result-stats"><div>OUTPUT DAMAGE<strong id="resultDamage">0</strong></div><div>ORE EXTRACTED<strong id="resultOre">0</strong></div></div>
+      <div id="worldReward" class="world-result-rewards" hidden></div>
+      <button id="resultToMapBtn" class="play-secondary world-result-return" type="button" hidden>◈ ワールドマップへ戻る</button>
       <button id="rematchBtn" class="play-primary" type="button">↻ もう一度プレイ</button>
     </div>
   </div>
