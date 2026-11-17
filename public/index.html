@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#091421">
+  <meta name="description" content="ROGUE FACTORY — 工場を構築して敵を撃破するオンライン工業ローグライクPvP。">
+  <title>ROGUE FACTORY — INDUSTRIAL WARFARE</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/effects.js"></script>
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="ambient-grid" aria-hidden="true"></div>
+  <div class="ambient-glow" aria-hidden="true"></div>
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div id="flash" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-emblem" aria-hidden="true">⌘</div>
+      <div>
+        <h1>ROGUE<span>FACTORY</span></h1>
+        <p>INDUSTRIAL WARFARE / EARLY ALPHA</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="server"><i id="connectionLight"></i><span id="connectionLabel">STANDBY</span></div>
+      <button id="audioToggle" class="icon-btn" type="button" title="効果音をON/OFF" aria-label="効果音を切り替え">♪ <span>OFF</span></button>
+      <label class="quality-select">演出
+        <select id="quality" aria-label="エフェクト品質">
+          <option value="high" selected>HIGH</option>
+          <option value="low">LOW</option>
+          <option value="off">OFF</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <section class="battle-heading">
+      <div class="section-caption">// LIVE FACTORY COMBAT</div>
+      <div class="heading-row">
+        <div class="battle-title"><span class="status-dot"></span><h2>INDUSTRIAL ARENA</h2><small id="gameModeLabel">SIMULATION READY</small></div>
+        <div class="countdown"><span>TIME REMAINING</span><strong id="timer">03:00</strong></div>
+      </div>
+      <div class="round-progress"><div id="timeProgress"></div></div>
+    </section>
+
+    <section class="battle-layout" id="battleLayout">
+      <article class="factory-panel ally">
+        <header class="factory-header">
+          <div><span class="eyebrow">01 // YOUR BASE</span><h3 id="myName">ENGINEER_01</h3></div>
+          <div class="core-gauge"><div class="core-gauge__text"><span>CORE INTEGRITY</span><strong id="myHp">400 / 400</strong></div><div class="core-bar"><i id="myHpBar"></i></div></div>
+        </header>
+        <div class="factory-grid-wrap" id="allyWrap">
+          <div class="grid-corner tl"></div><div class="grid-corner tr"></div><div class="grid-corner bl"></div><div class="grid-corner br"></div>
+          <div id="myGrid" class="factory-grid" role="grid" aria-label="自分の工場"></div>
+          <span class="grid-label">PRODUCTION GRID / 8×8</span>
+        </div>
+        <footer class="factory-footer">
+          <div><span>POWER NETWORK</span><strong id="myPower">0 / 12</strong></div>
+          <div><span>SCRAP BALANCE</span><strong id="myScrap">36</strong></div>
+          <div><span>WEAPON OUTPUT</span><strong id="myDamage">0</strong></div>
+        </footer>
+      </article>
+
+      <div class="combat-divider">
+        <div class="versus-mark"><b>VS</b><small>LIVE COMBAT</small></div>
+        <div class="lane-lines" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="combat-caption"><i></i>AUTO<br>FIRE</div>
+        <div class="combat-log" id="combatEvent">SYSTEM READY</div>
+      </div>
+
+      <article class="factory-panel enemy">
+        <header class="factory-header">
+          <div><span class="eyebrow">02 // HOSTILE BASE</span><h3 id="enemyName">AUTOMATON CPU</h3></div>
+          <div class="core-gauge"><div class="core-gauge__text"><span>CORE INTEGRITY</span><strong id="enemyHp">400 / 400</strong></div><div class="core-bar"><i id="enemyHpBar"></i></div></div>
+        </header>
+        <div class="factory-grid-wrap" id="enemyWrap">
+          <div class="grid-corner tl"></div><div class="grid-corner tr"></div><div class="grid-corner bl"></div><div class="grid-corner br"></div>
+          <div id="enemyGrid" class="factory-grid" role="grid" aria-label="敵の工場"></div>
+          <span class="grid-label">TARGET ACQUIRED / 8×8</span>
+        </div>
+        <footer class="factory-footer">
+          <div><span>POWER NETWORK</span><strong id="enemyPower">0 / 12</strong></div>
+          <div><span>SCRAP BALANCE</span><strong id="enemyScrap">36</strong></div>
+          <div><span>WEAPON OUTPUT</span><strong id="enemyDamage">0</strong></div>
+        </footer>
+      </article>
+    </section>
+
+    <section class="bottom-layout">
+      <article class="construction">
+        <div class="section-heading"><div><span class="section-caption">// FACTORY CONSTRUCTION</span><h3>BUILD MODULES</h3></div><div class="selection-hint" id="selectionHint">設備を選んでグリッドをクリック</div></div>
+        <div class="tool-grid" id="toolGrid"></div>
+        <div class="construction-footer">
+          <span id="toolDesc">設備を選択してください。</span>
+          <div class="utility-buttons">
+            <button type="button" id="rotateBtn" class="mini-button">↻ 回転</button>
+            <button type="button" id="deleteBtn" class="mini-button">⌫ 解体</button>
+            <button type="button" id="cancelToolBtn" class="mini-button">✕ 解除</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="operations">
+        <div class="section-heading"><div><span class="section-caption">// TACTICAL OVERVIEW</span><h3>OPERATIONS</h3></div></div>
+        <div class="operations-list">
+          <div class="stat-line"><span>⛏ ORE EXTRACTED</span><strong id="oreStat">0</strong></div>
+          <div class="stat-line"><span>⚙ METAL REFINED</span><strong id="metalStat">0</strong></div>
+          <div class="stat-line"><span>▣ AMMO PRODUCED</span><strong id="ammoStat">0</strong></div>
+          <div class="stat-line"><span>⚡ GRID LOAD</span><strong id="powerLoad">0%</strong></div>
+        </div>
+        <div class="target-control">
+          <span>FIRE PRIORITY</span>
+          <div class="segmented" id="targetSelector">
+            <button id="targetCore" class="active" type="button" data-target="core">◆ コア</button>
+            <button id="targetProduction" type="button" data-target="production">⚙ 設備</button>
+          </div>
+        </div>
+        <div class="operations-help">マシンをつなぐと資源が流れます。砲台は製造した弾薬を消費して攻撃します。</div>
+      </article>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div class="overlay is-visible" id="welcomeOverlay">
+    <div class="modal welcome-modal">
+      <span class="modal-kicker">// SYSTEM INITIALIZATION</span>
+      <div class="welcome-icon">⌘</div>
+      <h2>BUILD. AUTOMATE.<br><em>DESTROY.</em></h2>
+      <p>工場をつなぎ、弾薬を作り、敵のコアを破壊せよ。<br>3分間の工業ローグライクPvP。</p>
+      <label class="name-label" for="playerName">OPERATOR NAME</label>
+      <input id="playerName" maxlength="20" placeholder="ENGINEER" value="ENGINEER" autocomplete="nickname">
+      <div class="play-buttons">
+        <button id="soloBtn" class="play-primary" type="button">◉ CPUと対戦 <span>SOLO / TRAINING</span></button>
+        <button id="pvpBtn" class="play-secondary" type="button">⚔ オンライン対戦 <span>1 VS 1 MATCHMAKING</span></button>
+      </div>
+      <p class="welcome-note">PC: クリックで設置 / 右クリックで設備回転　・　タッチ操作対応</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="queueOverlay">
+    <div class="modal queue-modal">
+      <div class="radar"><div></div><span>⌾</span></div>
+      <span class="modal-kicker">SEARCHING FOR OPPONENT</span>
+      <h2>対戦相手を検索中</h2>
+      <p>オンラインのプレイヤーとマッチングします。</p>
+      <button id="cancelQueueBtn" class="play-secondary" type="button">検索をキャンセル</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="upgradeOverlay">
+    <div class="modal upgrade-modal">
+      <span class="modal-kicker">// TECHNOLOGY BREAKTHROUGH</span>
+      <h2>研究アップグレード</h2>
+      <p>3つの設計図から1つを選び、工場を進化させよう。</p>
+      <div id="upgradeChoices" class="upgrade-grid"></div>
+      <span class="upgrade-subtext">各研究は最大2回まで選択可能</span>
+    </div>
+  </div>
+
+  <div class="overlay" id="resultOverlay">
+    <div class="modal result-modal">
+      <span class="modal-kicker">// MATCH COMPLETE</span>
+      <div id="resultSymbol" class="result-symbol">✦</div>
+      <h2 id="resultTitle">VICTORY</h2>
+      <p id="resultDetail">敵コアを破壊しました。</p>
+      <div class="result-stats"><div>OUTPUT DAMAGE<strong id="resultDamage">0</strong></div><div>ORE EXTRACTED<strong id="resultOre">0</strong></div></div>
+      <button id="rematchBtn" class="play-primary" type="button">↻ もう一度プレイ</button>
+    </div>
+  </div>
+</body>
+</html>
