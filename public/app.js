@@ -23,16 +23,17 @@ function connect(){
  if(ws&&(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING))return;
  ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host);
  $("connectionLabel").textContent="CONNECTING";
- ws.onopen=()=>{$("connectionLabel").textContent="ONLINE";$("connectionLight").classList.add("online");clearTimeout(retryTimer);window.RogueHQ?.onConnected(send);};
+ ws.onopen=()=>{$("connectionLabel").textContent="ONLINE";$("connectionLight").classList.add("online");clearTimeout(retryTimer);window.RogueHQ?.onConnected(send);window.IndustrialWorld?.onConnected(send);};
  ws.onclose=()=>{
   $("connectionLabel").textContent="OFFLINE";$("connectionLight").classList.remove("online");
-  playing=false;state=null;mode=null;document.body.classList.remove("playing");window.RogueHQ?.onDisconnected();overlay("welcomeOverlay");
+  playing=false;state=null;mode=null;document.body.classList.remove("playing");window.RogueHQ?.onDisconnected();window.IndustrialWorld?.onDisconnected();overlay("welcomeOverlay");
   retryTimer=setTimeout(connect,2200);
  };
  ws.onerror=()=>{$("connectionLabel").textContent="ERROR";};
  ws.onmessage=e=>{
   let msg;try{msg=JSON.parse(e.data)}catch{return}
   if(msg.type?.startsWith("home:")){window.RogueHQ?.receive(msg);return;}
+  if(msg.type?.startsWith("industry:")){window.IndustrialWorld?.receive(msg);return;}
   if(msg.type==="start"){
    defs=msg.definitions;upgradeDefs=msg.upgrades;meIndex=msg.playerIndex;state=null;playing=true;mode=null;
    lastUpgrade="";document.body.classList.add("playing");makeTools();overlay(null);notify("対戦開始！工場を建設しよう");
