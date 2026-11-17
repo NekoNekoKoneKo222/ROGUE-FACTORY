@@ -82,7 +82,7 @@ function newGame(a,b,options={}) {
       });
       human.scrap=Math.max(40,Math.min(500,Math.floor(base.resources?.scrap||0)));
       game.tankGarrison=Math.min(20,Math.max(0,Math.floor(base.army?.tank||0))+
-          Math.max(0,Math.floor(base.army?.artillery||0))*2));
+          Math.max(0,Math.floor(base.army?.artillery||0))*2);
       // Main HQ never gets removed or overwritten by a lost expedition.
       game.homeBaseActive=true;
     }
