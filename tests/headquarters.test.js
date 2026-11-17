@@ -27,7 +27,8 @@ test("HQ buildings are persistent; tanks require a dedicated factory",()=>{
  assert.equal(HQ.modify(h,{action:"train",unit:"tank",count:1}).ok,false);
  const before=h.resources.scrap;
  assert.equal(HQ.modify(h,{action:"place",machine:"tankPlant",x:8,y:7}).ok,true);
- assert.equal(h.resources.scrap,before-HQ.TYPES.tankPlant.price);
+ assert.ok(Math.abs(h.resources.scrap-(before-HQ.TYPES.tankPlant.price))<0.1,
+   "Construction cost should be correct, allowing tiny wall-clock offline-production increments");
  assert.equal(HQ.modify(h,{action:"train",unit:"tank",count:1}).ok,true);
  assert.equal(h.queue.length,1);
  assert.equal(HQ.modify(h,{action:"train",unit:"artillery",count:1}).ok,false);
