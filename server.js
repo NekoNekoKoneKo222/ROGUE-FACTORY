@@ -7,6 +7,7 @@ const crypto = require("node:crypto");
 const { WebSocketServer, WebSocket } = require("ws");
 const { Pool } = require("pg");
 const engine = require("./game/engine");
+const WorldData = require("./public/world-data.js");
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = path.resolve(__dirname, "public");
@@ -56,8 +57,8 @@ function stopMatch(match){
   if(match.timer)clearInterval(match.timer);
   games.delete(match.game.id);
 }
-function startGame(sockets,players){
-  const game=engine.newGame(players[0],players[1]);
+function startGame(sockets,players,options={}){
+  const game=engine.newGame(players[0],players[1],options);
   const match={game,sockets,saved:false,timer:null};
   games.set(game.id,match);
   sockets.forEach((ws,index)=>{
@@ -92,6 +93,12 @@ wss.on("connection",ws=>{
       ws.name=safeName(msg.name);
       if(msg.mode==="solo"){
         startGame([ws],[{id:ws.id,name:ws.name},{id:"cpu-"+crypto.randomUUID(),name:"AUTOMATON CPU",bot:true}]);
+      }else if(msg.mode==="world"){
+        const stageId=typeof msg.stageId==="string"?msg.stageId:"";
+        const stage=Object.hasOwn(WorldData.byId,stageId)?WorldData.byId[stageId]:null;
+        if(!stage){send(ws,{type:"error",message:"不明なワールドステージです"});return;}
+        // Stage modifiers are looked up server-side, never accepted from clients.
+        startGame([ws],[{id:ws.id,name:ws.name},{id:"cpu-"+crypto.randomUUID(),name:"ENEMY / "+stage.name,bot:true}],{stage});
       }else if(msg.mode==="pvp"){
         if(waiting && waiting.readyState===WebSocket.OPEN && waiting!==ws){
           const partner=waiting;waiting=null;
