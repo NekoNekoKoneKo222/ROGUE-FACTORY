@@ -1,9 +1,9 @@
 "use strict";
 (()=>{
 const $=id=>document.getElementById(id),FX=window.FactoryFX,SIZE=12,CORE_IDX=10*SIZE+5;
-const icons={core:"◆",generator:"ϟ",drill:"⛏",belt:"➜",furnace:"♨",ammo:"⚙",turret:"✹",rocket:"➤",wall:"▦",shield:"◈",repair:"✚"};
-const desc={generator:"発電機：工場に電力を供給。",drill:"採掘機：鉱石を掘り、矢印の方向へ出力。",belt:"コンベア：アイテムを隣の設備へ輸送。",furnace:"精錬機：鉱石から金属を作成。",ammo:"弾薬工場：金属から弾薬を製造。",turret:"機関砲：弾薬を使い敵を撃つ。",rocket:"ミサイル：弾薬を2つ消費し大ダメージ。",wall:"装甲壁：敵のミサイルから工場を守る。",shield:"シールド：コアへのダメージを軽減。",repair:"修復機：金属を消費して設備を修理。"};
-const order=["generator","drill","belt","furnace","ammo","turret","rocket","wall","shield","repair"];
+const icons={core:"◆",generator:"ϟ",drill:"⛏",belt:"➜",furnace:"♨",ammo:"⚙",turret:"✹",rocket:"➤",wall:"▦",shield:"◈",repair:"✚",tankPlant:"▣"};
+const desc={generator:"発電機：工場に電力を供給。",drill:"採掘機：鉱石を掘り、矢印の方向へ出力。",belt:"コンベア：アイテムを隣の設備へ輸送。",furnace:"精錬機：鉱石から金属を作成。",ammo:"弾薬工場：金属から弾薬を製造。",turret:"機関砲：弾薬を使い敵を撃つ。",rocket:"ミサイル：弾薬を2つ消費し大ダメージ。",wall:"装甲壁：敵のミサイルから工場を守る。",shield:"シールド：コアへのダメージを軽減。",repair:"修復機：金属を消費して設備を修理。",tankPlant:"戦車工場：恒久基地の製造設備。兵器は基地メニューで製造。"};
+const order=["generator","drill","belt","furnace","ammo","turret","rocket","wall","shield","repair","tankPlant"];
 let ws=null,defs={},upgradeDefs=[],state=null,meIndex=0,selection="drill",selectedCell=null,mode=null,playing=false,lastUpgrade="",toastTimer,retryTimer;
 $("playerName").value=localStorage.getItem("rf-name")||"ENGINEER";
 const stored=localStorage.getItem("rf-effects")||FX.quality;
@@ -23,15 +23,16 @@ function connect(){
  if(ws&&(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING))return;
  ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host);
  $("connectionLabel").textContent="CONNECTING";
- ws.onopen=()=>{$("connectionLabel").textContent="ONLINE";$("connectionLight").classList.add("online");clearTimeout(retryTimer);};
+ ws.onopen=()=>{$("connectionLabel").textContent="ONLINE";$("connectionLight").classList.add("online");clearTimeout(retryTimer);window.RogueHQ?.onConnected(send);};
  ws.onclose=()=>{
   $("connectionLabel").textContent="OFFLINE";$("connectionLight").classList.remove("online");
-  playing=false;state=null;mode=null;document.body.classList.remove("playing");overlay("welcomeOverlay");
+  playing=false;state=null;mode=null;document.body.classList.remove("playing");window.RogueHQ?.onDisconnected();overlay("welcomeOverlay");
   retryTimer=setTimeout(connect,2200);
  };
  ws.onerror=()=>{$("connectionLabel").textContent="ERROR";};
  ws.onmessage=e=>{
   let msg;try{msg=JSON.parse(e.data)}catch{return}
+  if(msg.type?.startsWith("home:")){window.RogueHQ?.receive(msg);return;}
   if(msg.type==="start"){
    defs=msg.definitions;upgradeDefs=msg.upgrades;meIndex=msg.playerIndex;state=null;playing=true;mode=null;
    lastUpgrade="";document.body.classList.add("playing");makeTools();overlay(null);notify("対戦開始！工場を建設しよう");
