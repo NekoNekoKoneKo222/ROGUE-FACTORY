@@ -119,25 +119,48 @@ function defenseScore(base){
  const power=(counts.generator||0)*12;
  const draw=(counts.turret||0)*4+(counts.rocket||0)*6+(counts.shield||0)*5+(counts.tankPlant||0)*4;
  const grid=Math.min(1,power/Math.max(1,draw));
- return Math.round(((counts.turret||0)*27+(counts.rocket||0)*40)*grid+
+ let score=Math.round(((counts.turret||0)*27+(counts.rocket||0)*40)*grid+
   (counts.wall||0)*14+(counts.shield||0)*30+(base.army.tank||0)*30+
   (base.army.artillery||0)*45+base.hp*.15);
+ const world=base.industry;
+ if(world?.version===2 && world.entities){
+   const industrial=Object.values(world.entities).filter(e=>e.hp>1);
+   const number=t=>industrial.filter(e=>e.type===t).reduce((n,e)=>n+(e.level||1),0);
+   const supply=number("generator")*45+number("solar")*12;
+   const draw=number("turret")*3+number("laser")*16;
+   const utilization=Math.min(1,supply/Math.max(1,draw));
+   score+=Math.round((number("turret")*20+number("laser")*46)*utilization+
+     number("wall")*11+number("repair")*16+
+     (world.friendly?.length||0)*24+
+     (world.warehouse?.tank||0)*27);
+ }
+ return score;
 }
 function raid(a,d,unit,count){
  tick(a);tick(d);
  const def=UNITS[unit],now=Date.now();
  if(!def||!Number.isInteger(count)||count<1||count>20)return {ok:false,error:"兵器数が不正です"};
- if(a.army[unit]<count)return {ok:false,error:"戦車が足りません"};
+ const stored=unit==="tank"?Math.max(0,Math.floor(a.industry?.warehouse?.tank||0)):0;
+ if((a.army[unit]||0)+stored<count)return {ok:false,error:"戦車が足りません"};
  if(a.attackAt>now)return {ok:false,error:"出撃クールダウン中です"};
  if(d.shieldUntil>now)return {ok:false,error:"相手の防衛シールドが有効です"};
  const attack=count*def.attack+a.level*5,defense=defenseScore(d);
  const victory=attack>defense,dead=Math.min(count,Math.max(1,Math.ceil(defense/def.attack)));
- a.army[unit]-=dead;a.attackAt=now+2*60*1000;
+ const usedFromWorld=Math.min(stored,dead);
+ if(usedFromWorld)a.industry.warehouse.tank-=usedFromWorld;
+ a.army[unit]-=dead-usedFromWorld;a.attackAt=now+2*60*1000;
  const loot=victory?Math.min(75,Math.floor(d.resources.scrap*.08)):0;
  if(victory){d.resources.scrap-=loot;a.resources.scrap+=loot;a.trophies+=12;a.raidsWon++;d.raidsLost++;}
  else a.trophies=Math.max(0,a.trophies-3);
  d.hp=Math.max(Math.round(d.maxHp*.4),d.hp-(victory?65:15));
  d.shieldUntil=now+15*60*1000;
+ if(d.industry?.entities){
+   const buildings=Object.values(d.industry.entities).filter(e=>e.type!=="core"&&e.hp>1);
+   const pick=buildings.filter(e=>["wall","turret","laser"].includes(e.type))[0]||buildings[0];
+   if(pick)pick.hp=Math.max(1,pick.hp-(victory?24:8));
+   const industrialCore=d.industry.entities["0,0"];
+   if(industrialCore)industrialCore.hp=Math.max(200,industrialCore.hp-(victory?35:12));
+ }
  return {ok:true,victory,attack,defense,loot,casualties:dead,count,returned:count-dead};
 }
 const tokenHash=t=>crypto.createHash("sha256").update(t).digest("hex");
@@ -195,6 +218,11 @@ function api(pool){
    const a=r.rows.find(row=>row.id===attackerId),d=r.rows.find(row=>row.id===defenderId);
    const result=raid(a.base,d.base,unit,count);
    if(!result.ok){await db.query("ROLLBACK");return result;}
+   if(d.base.industry?.log){
+     d.base.industry.log.unshift({at:Date.now(),message:"⚔ "+
+       a.display_name+" の戦車部隊が基地を襲撃しました"+(result.victory?"（一部設備が損傷）":"（防衛成功）")});
+     d.base.industry.log=d.base.industry.log.slice(0,15);
+   }
    for(const row of [a,d])await db.query("UPDATE home_accounts SET base=$2,updated_at=now() WHERE id=$1",[row.id,JSON.stringify(row.base)]);
    await db.query("INSERT INTO home_raids (attacker_id,defender_id,attacker_name,defender_name,victory,loot,attack_score,defense_score) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
     [a.id,d.id,a.display_name,d.display_name,result.victory,result.loot,result.attack,result.defense]);
