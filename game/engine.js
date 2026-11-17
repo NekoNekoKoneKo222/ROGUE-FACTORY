@@ -1,7 +1,10 @@
 "use strict";
 
-const SIZE = 8;
-const LENGTH = 180;
+const SIZE = 12;
+const LENGTH = 330;
+const BUILD_TIME = 180;
+const DEPOSIT_POINTS = Object.freeze([[1,1],[1,3],[3,3],[8,1],[9,2],[2,6],[9,6],[2,9],[8,9],[10,10]]);
+const CORE_POS=[5,10];
 const DIRECTIONS = [[0,-1],[1,0],[0,1],[-1,0]];
 const DEFINITIONS = Object.freeze({
   core:      { name: "コア", icon: "◆", hp: 400, cost: 0, power: 0 },
@@ -38,9 +41,9 @@ function machine(type, dir=1) {
 }
 function makePlayer(id, name, bot=false) {
   const board=Array(SIZE*SIZE).fill(null);
-  for (const [x,y,type] of [[3,7,"core"],[0,6,"generator"],[1,1,"drill"],[2,1,"belt"],[3,1,"furnace"],[4,1,"belt"],[5,1,"ammo"],[6,1,"turret"]]) board[idx(x,y)]=machine(type);
+  for (const [x,y,type] of [[...CORE_POS,"core"],[0,6,"generator"],[1,1,"drill"],[2,1,"belt"],[3,1,"furnace"],[4,1,"belt"],[5,1,"ammo"],[6,1,"turret"]]) board[idx(x,y)]=machine(type);
   return {
-    id, name, bot, board, scrap:36, coreHp:400, maxCoreHp:400,
+    id, name, bot, board, deposits:DEPOSIT_POINTS.map(p=>idx(...p)), scrap:36, coreHp:400, maxCoreHp:400,
     upgrades:[], options:[], optionTime:0, focus:"core", powerUsed:0, powerTotal:0,
     stats:{ore:0,metal:0,ammo:0,damage:0}, aiStep:0,
     damageFactor:1, incomeFactor:1, disableBotBuild:false
@@ -57,8 +60,12 @@ function newGame(a,b,options={}) {
   const stage=options.stage||null;
   const game={id:randomId(), elapsed:0, ended:false, winner:null, finishReason:null, event:null,
     mode:stage?"world":(b.bot?"solo":"pvp"),stageId:stage?.id||null,
+    stageDifficulty:stage?.difficulty||1,stageType:stage?.type||"battle",
     stageName:stage?.name||null,stageRule:stage?.rule||null,
-    length:Number.isFinite(stage?.duration)?Math.max(60,stage.duration):LENGTH,
+    length:stage?Math.max(300,stage.duration||320+(stage.difficulty||1)*36):(b.bot?360:LENGTH),
+    buildTime:!b.bot&&!stage?BUILD_TIME:0, phase:!b.bot&&!stage?"build":"defense",
+    enemies:[],wave:0,maxWaves:stage?(stage.id==="tutorial"?1:Math.min(7,3+Math.floor((stage.difficulty||1)/2))):4,
+    nextWaveAt:stage?.id==="tutorial"?120:43,waveInterval:50,threatHits:0,
     players:[makePlayer(a.id,a.name,!!a.bot),makePlayer(b.id,b.name,!!b.bot)]
   };
   if(stage){
@@ -69,7 +76,7 @@ function newGame(a,b,options={}) {
     enemy.damageFactor=stage.enemyDamage??1;
     enemy.coreHp=stage.coreHp??400;
     enemy.maxCoreHp=enemy.coreHp;
-    enemy.board[idx(3,7)].hp=enemy.coreHp;
+    enemy.board[idx(...CORE_POS)].hp=enemy.coreHp;
     if(stage.id==="tutorial"){
       // Beginner exercise: construct the missing conveyor / furnace / ammo line.
       for(const [x,y] of [[2,1],[3,1],[4,1],[5,1],[6,1]])human.board[idx(x,y)]=null;
@@ -89,16 +96,21 @@ function costFor(player,type) {
 }
 function build(game,who,type,x,y,dir=1) {
   const p=game.players[who];
-  if(game.ended || !valid(x,y) || !DEFINITIONS[type] || type==="core" || p.board[idx(x,y)]) return {ok:false,error:"設置できない場所です"};
+  if(game.ended || game.phase==="battle" || !valid(x,y) || !DEFINITIONS[type] || type==="core" || p.board[idx(x,y)]) return {ok:false,error:"建設できません（PvP戦闘中は建設不可）"};
+  if(type==="drill"&&!p.deposits.includes(idx(x,y)))return {ok:false,error:"採掘機は鉱脈の上にのみ設置できます"};
   const cost=costFor(p,type);
   if(p.scrap+0.001<cost) return {ok:false,error:"スクラップが足りません"};
   p.scrap-=cost;
   p.board[idx(x,y)]=machine(type,(Number.isInteger(dir)?dir:1)+4>>>0 & 3);
+  if(game.stageId==="tutorial" && who===0){
+    const path=[[2,1,"belt"],[3,1,"furnace"],[4,1,"belt"],[5,1,"ammo"],[6,1,"turret"]];
+    if(path.every(([px,py,t])=>p.board[idx(px,py)]?.type===t))game.nextWaveAt=Math.min(game.nextWaveAt,game.elapsed+9);
+  }
   return {ok:true};
 }
 function dismantle(game,who,x,y) {
   const p=game.players[who];
-  if(game.ended || !valid(x,y)) return {ok:false,error:"操作できません"};
+  if(game.ended || game.phase==="battle" || !valid(x,y)) return {ok:false,error:"戦闘中は変更できません"};
   const m=p.board[idx(x,y)];
   if(!m || m.type==="core") return {ok:false,error:"この設備は解体できません"};
   p.scrap+=Math.floor(DEFINITIONS[m.type].cost*0.5);
@@ -107,7 +119,7 @@ function dismantle(game,who,x,y) {
 }
 function rotate(game,who,x,y) {
   const p=game.players[who];
-  if(game.ended || !valid(x,y)) return {ok:false,error:"操作できません"};
+  if(game.ended || game.phase==="battle" || !valid(x,y)) return {ok:false,error:"戦闘中は変更できません"};
   const m=p.board[idx(x,y)];
   if(!m || m.type==="core") return {ok:false,error:"回転できません"};
   m.dir=(m.dir+1)%4;
@@ -118,7 +130,7 @@ function choose(game,who,id) {
   if(game.ended || !p.options.includes(id)) return {ok:false,error:"選択できない研究です"};
   p.options=[];
   p.upgrades.push(id);
-  if(id==="core") {p.coreHp+=60;p.maxCoreHp+=60;p.board[idx(3,7)].hp+=60;}
+  if(id==="core") {p.coreHp+=60;p.maxCoreHp+=60;p.board[idx(...CORE_POS)].hp+=60;}
   if(id==="scrap") p.scrap+=30;
   return {ok:true};
 }
@@ -159,6 +171,11 @@ function activeInterval(p,type,base) {
   return base/factor;
 }
 function damage(game,who,base,mode) {
+  if(game.mode!=="pvp"){
+    if(who===0)return damageWave(game,base,mode);
+    return;
+  }
+  if(game.phase==="build")return;
   const attacker=game.players[who], defender=game.players[1-who];
   const shields=defender.board.filter(m=>m&&m.type==="shield"&&m.active).length;
   let points=base*(attacker.upgrades.includes("fire")?1.3:1)*(attacker.damageFactor??1);
@@ -175,9 +192,57 @@ function damage(game,who,base,mode) {
     }
   }else{
     defender.coreHp=Math.max(0,defender.coreHp-points);
-    defender.board[idx(3,7)].hp=defender.coreHp;
+    defender.board[idx(...CORE_POS)].hp=defender.coreHp;
   }
   attacker.stats.damage+=points;
+}
+function damageWave(game,base,mode) {
+  const p=game.players[0];
+  if(!game.enemies.length)return;
+  game.enemies.sort((a,b)=>b.progress-a.progress);
+  const target=game.enemies[0];
+  let points=base*(p.upgrades.includes("fire")?1.3:1);
+  if(p.upgrades.includes("crit") && Math.random()<0.15)points*=2;
+  target.hp=Math.max(0,target.hp-points);
+  p.stats.damage+=points;
+  if(mode==="rocket"){
+    for(const other of game.enemies.slice(1,4))other.hp=Math.max(0,other.hp-points*0.3);
+  }
+  game.enemies=game.enemies.filter(e=>e.hp>0);
+}
+function spawnWave(game){
+  const wave=++game.wave, diff=game.mode==="world"?(game.stageDifficulty||1):2;
+  const count=game.stageId==="tutorial"?2:Math.min(22,2+wave*2+Math.floor(diff/2));
+  for(let i=0;i<count;i++){
+    const boss=wave===game.maxWaves && (game.stageType==="boss" || game.stageId?.includes("boss")) && i===0;
+    const hp=(boss?135+diff*34:12+diff*4+wave*3);
+    game.enemies.push({id:wave*100+i,kind:boss?"boss":i%4===0?"armored":"raider",hp,maxHp:hp,
+      progress:-(i*0.048),speed:(boss?0.009:0.021)+(Math.random()*0.002),
+      damage:boss?45+diff*7:8+diff*2+wave});
+  }
+  game.event="WAVE "+wave+" / "+game.maxWaves+" — 襲撃開始！";
+  game.nextWaveAt+=game.waveInterval;
+}
+function processEnemies(game,dt){
+  if(!game.enemies.length)return;
+  const human=game.players[0];
+  for(const enemy of game.enemies){
+    enemy.progress+=enemy.speed*dt;
+    if(enemy.progress<1)continue;
+    const walls=human.board.map((m,i)=>({m,i})).filter(o=>o.m && o.m.type==="wall");
+    if(walls.length){
+      const target=walls[Math.floor(Math.random()*walls.length)];
+      target.m.hp-=enemy.damage;
+      if(target.m.hp<=0)human.board[target.i]=null;
+    }else{
+      const shields=human.board.filter(m=>m&&m.type==="shield"&&m.active).length;
+      human.coreHp=Math.max(0,human.coreHp-enemy.damage*Math.max(.4,1-shields*.14));
+      human.board[idx(...CORE_POS)].hp=human.coreHp;
+    }
+    game.threatHits++;
+    enemy.hp=0;
+  }
+  game.enemies=game.enemies.filter(e=>e.hp>0);
 }
 function processPlayer(game,who,dt) {
   const p=game.players[who];
@@ -208,10 +273,10 @@ function processPlayer(game,who,dt) {
     if(m.type==="ammo" && m.buf>0 && m.output<6 && m.timer>=activeInterval(p,"ammo",2)){
       m.buf--;m.output+=p.upgrades.includes("ammo")?3:2;m.timer=0;p.stats.ammo+=p.upgrades.includes("ammo")?3:2;
     }
-    if(m.type==="turret" && m.buf>0 && m.timer>=2.8){
+    if(m.type==="turret" && m.buf>0 && (game.mode==="pvp"?game.phase==="battle":who===0 && game.enemies.length>0) && m.timer>=2.8){
       m.buf--;m.timer=0;damage(game,who,10,"turret");
     }
-    if(m.type==="rocket" && m.buf>=2 && m.timer>=5){
+    if(m.type==="rocket" && m.buf>=2 && (game.mode==="pvp"?game.phase==="battle":who===0 && game.enemies.length>0) && m.timer>=5){
       m.buf-=2;m.timer=0;damage(game,who,27,"rocket");
     }
     if(m.type==="repair" && m.buf>0 && m.timer>=2){
@@ -224,7 +289,7 @@ function processPlayer(game,who,dt) {
   }
   if(p.upgrades.includes("repair") && p.coreHp<p.maxCoreHp){
     p.coreHp=Math.min(p.maxCoreHp,p.coreHp+dt);
-    p.board[idx(3,7)].hp=p.coreHp;
+    p.board[idx(...CORE_POS)].hp=p.coreHp;
   }
 }
 function botAction(game,dt) {
@@ -246,22 +311,34 @@ function step(game,dt=0.25) {
   for(const p of game.players) {
     if(p.options.length && game.elapsed-p.optionTime>=9) choose(game,game.players.indexOf(p),p.options[0]);
   }
+  if(game.mode==="pvp" && before<BUILD_TIME && game.elapsed>=BUILD_TIME){
+    game.phase="battle";game.event="PvP戦闘開始！ 3分間で作った工場が戦います";
+  }
   if(game.stageId!=="tutorial"){
-    for(let marker=30;marker<game.length;marker+=30){
+    for(let marker=30;marker<(game.mode==="pvp"?BUILD_TIME:game.length);marker+=30){
       if(before<marker && game.elapsed>=marker)game.players.forEach(p=>offer(p,game.elapsed));
     }
   }
-  if(game.stageId!=="tutorial" && before<90 && game.elapsed>=90)game.event="鉱石フィーバー！";
-  if(before<game.length-30 && game.elapsed>=game.length-30)game.event="最終決戦！ 残り30秒";
-  botAction(game,dt);
-  // Alternating first processing player reduces first-mover advantages.
-  if(Math.floor(game.elapsed/dt)%2){processPlayer(game,0,dt);processPlayer(game,1,dt);}
-  else{processPlayer(game,1,dt);processPlayer(game,0,dt);}
-  if(game.players.some(p=>p.coreHp<=0) || game.elapsed>=game.length){
+  if(before<game.length-30 && game.elapsed>=game.length-30)game.event="最終局面！ 残り30秒";
+  if(game.mode==="pvp"){
+    // Build for a full 180 seconds; the initial protected phase deals no damage.
+    if(Math.floor(game.elapsed/dt)%2){processPlayer(game,0,dt);processPlayer(game,1,dt);}
+    else{processPlayer(game,1,dt);processPlayer(game,0,dt);}
+  }else{
+    if(game.wave<game.maxWaves && game.elapsed>=game.nextWaveAt)spawnWave(game);
+    processPlayer(game,0,dt);
+    processEnemies(game,dt);
+  }
+  if(game.mode!=="pvp" && game.wave===game.maxWaves && game.enemies.length===0){
+    game.ended=true;game.winner=game.players[0].coreHp>0?game.players[0].id:game.players[1].id;
+    game.finishReason=game.players[0].coreHp>0?"defense":"core";
+    return game;
+  }
+  if(game.players.some((p,i)=>p.coreHp<=0&&(game.mode==="pvp"||i===0)) || game.elapsed>=game.length){
     game.ended=true;
     const [a,b]=game.players;
     const r=a.coreHp/a.maxCoreHp-b.coreHp/b.maxCoreHp;
-    game.winner=Math.abs(r)<0.00001?"draw":r>0?a.id:b.id;
+    game.winner=game.mode==="pvp"?(Math.abs(r)<0.00001?"draw":r>0?a.id:b.id):(a.coreHp>0 && game.wave===game.maxWaves && !game.enemies.length?a.id:b.id);
     game.finishReason=game.elapsed>=game.length?"time":"core";
   }
   return game;
@@ -269,13 +346,15 @@ function step(game,dt=0.25) {
 function snapshot(game) {
   return {id:game.id,elapsed:Math.round(game.elapsed*10)/10,length:game.length,
     mode:game.mode,stageId:game.stageId,stageName:game.stageName,stageRule:game.stageRule,
+    phase:game.phase,buildTime:game.buildTime,wave:game.wave,maxWaves:game.maxWaves,threatHits:game.threatHits,
+    enemies:game.enemies.map(e=>({id:e.id,kind:e.kind,hp:Math.ceil(e.hp),maxHp:e.maxHp,progress:e.progress})),
     ended:game.ended,winner:game.winner,
     finishReason:game.finishReason,event:game.event,
     players:game.players.map(p=>({
-      id:p.id,name:p.name,bot:p.bot,board:p.board.map(m=>m && ({
+      id:p.id,name:p.name,bot:p.bot,deposits:p.deposits,board:p.board.map(m=>m && ({
         type:m.type,hp:Math.ceil(m.hp),dir:m.dir,buf:m.buf,cargo:m.cargo,output:m.output,active:m.active
       })),scrap:Math.floor(p.scrap),coreHp:Math.ceil(p.coreHp),maxCoreHp:p.maxCoreHp,
       powerUsed:p.powerUsed,powerTotal:p.powerTotal,stats:p.stats,options:p.options,upgrades:p.upgrades,focus:p.focus
     }))};
 }
-module.exports={SIZE,LENGTH,DEFINITIONS,UPGRADES,newGame,step,build,dismantle,rotate,choose,snapshot,costFor};
+module.exports={SIZE,LENGTH,BUILD_TIME,DEFINITIONS,UPGRADES,newGame,step,build,dismantle,rotate,choose,snapshot,costFor};
