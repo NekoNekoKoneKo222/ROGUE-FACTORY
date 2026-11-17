@@ -156,3 +156,26 @@ test("manufactured tanks can be dispatched as physical allied defenders",()=>{
  simulate(world,6);
  assert.ok(world.enemies[0].hp<140 || world.stats.kills>0);
 });
+
+test("industrial-world fortifications increase resistance to other player raids",()=>{
+ const base=HQ.starter();
+ const world=Industrial.ensure(base);
+ const initial=HQ.defenseScore(base);
+ world.entities["2,0"]=Industrial.makeEntity("wall",2,0);
+ world.entities["3,0"]=Industrial.makeEntity("laser",3,0);
+ world.entities["4,0"]=Industrial.makeEntity("generator",4,0);
+ const after=HQ.defenseScore(base);
+ assert.ok(after>initial,"Industrial machinery must contribute to persistent PvP defense");
+});
+test("player-made tanks can be used to raid another permanent factory without deleting it",()=>{
+ const attacker=HQ.starter(),defender=HQ.starter();
+ const wa=Industrial.ensure(attacker),wd=Industrial.ensure(defender);
+ attacker.army.tank=0;wa.warehouse.tank=20;
+ const original=Object.keys(wd.entities).sort();
+ const outcome=HQ.raid(attacker,defender,"tank",20);
+ assert.equal(outcome.ok,true);
+ assert.ok(wa.warehouse.tank<20);
+ assert.deepEqual(Object.keys(wd.entities).sort(),original,"A raid must not delete any permanent buildings");
+ assert.ok(wd.entities["0,0"].hp>=200);
+ assert.ok(defender.shieldUntil>Date.now());
+});
