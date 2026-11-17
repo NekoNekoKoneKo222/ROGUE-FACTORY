@@ -65,7 +65,10 @@ test("land expansion increases the buildable area without finite stage boundarie
 });
 test("no buildings can be placed into water, outside land or on non-ore drills",()=>{
  const {base,world}=fresh();
- assert.equal(Industrial.command(base,{action:"build",machine:"drill",x:2,y:2}).ok,false);
+ const empty=Array.from({length:25},(_,i)=>({x:i%5-2,y:Math.floor(i/5)-2}))
+   .find(p=>!Shared.tileAt(world.seed,p.x,p.y).ore && !world.entities[point(p.x,p.y)]);
+ assert.ok(empty,"A deterministic empty spot should be available near the HQ");
+ assert.equal(Industrial.command(base,{action:"build",machine:"drill",x:empty.x,y:empty.y}).ok,false);
  assert.equal(Industrial.command(base,{action:"build",machine:"furnace",x:0,y:0}).ok,false);
  assert.equal(Industrial.command(base,{action:"build",machine:"furnace",x:3000,y:0}).ok,false);
  assert.equal(world.entities["0,0"].type,"core");
@@ -155,4 +158,27 @@ test("manufactured tanks can be dispatched as physical allied defenders",()=>{
  world.enemies=[{id:1,x:3,y:4,type:"biter",hp:140,maxHp:140,cooldown:0}];
  simulate(world,6);
  assert.ok(world.enemies[0].hp<140 || world.stats.kills>0);
+});
+
+test("industrial-world fortifications increase resistance to other player raids",()=>{
+ const base=HQ.starter();
+ const world=Industrial.ensure(base);
+ const initial=HQ.defenseScore(base);
+ world.entities["2,0"]=Industrial.makeEntity("wall",2,0);
+ world.entities["3,0"]=Industrial.makeEntity("laser",3,0);
+ world.entities["4,0"]=Industrial.makeEntity("generator",4,0);
+ const after=HQ.defenseScore(base);
+ assert.ok(after>initial,"Industrial machinery must contribute to persistent PvP defense");
+});
+test("player-made tanks can be used to raid another permanent factory without deleting it",()=>{
+ const attacker=HQ.starter(),defender=HQ.starter();
+ const wa=Industrial.ensure(attacker),wd=Industrial.ensure(defender);
+ attacker.army.tank=0;wa.warehouse.tank=20;
+ const original=Object.keys(wd.entities).sort();
+ const outcome=HQ.raid(attacker,defender,"tank",20);
+ assert.equal(outcome.ok,true);
+ assert.ok(wa.warehouse.tank<20);
+ assert.deepEqual(Object.keys(wd.entities).sort(),original,"A raid must not delete any permanent buildings");
+ assert.ok(wd.entities["0,0"].hp>=200);
+ assert.ok(defender.shieldUntil>Date.now());
 });
